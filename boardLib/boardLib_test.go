@@ -42,69 +42,45 @@ func TestBoardSize(t *testing.T) {
 
 func setUpMoveRightOldBoard() (oldBoard BoardT) {
 	oldBoard = [BoardSize][BoardSize]int{
-		[BoardSize]int{16, 8, 4, 2},
-		[BoardSize]int{4, 2, 2, 0},
-		[BoardSize]int{2, 4, 0, 2},
-		[BoardSize]int{0, 0, 0, 0},
+		{16, 8, 4, 2},
+		{4, 2, 2, 0},
+		{2, 4, 0, 2},
+		{0, 0, 0, 0},
 	}
 	return
 }
 
 func setUpMoveRightNewBoard() BoardT {
 	return [BoardSize][BoardSize]int{
-		[BoardSize]int{16, 8, 4, 2},
-		[BoardSize]int{0, 0, 4, 4},
-		[BoardSize]int{0, 2, 4, 2},
-		[BoardSize]int{0, 0, 0, 0},
+		{16, 8, 4, 2},
+		{0, 0, 4, 4},
+		{0, 2, 4, 2},
+		{0, 0, 0, 0},
 	}
 }
 
 func setUpMoveRightNonMergedMoves() []moveT {
 	return []moveT{
-		moveT{positionT{1, 0}, positionT{1, 2}},
-		moveT{positionT{2, 0}, positionT{2, 1}},
-		moveT{positionT{2, 1}, positionT{2, 2}},
+		moveT{{1, 0}, {1, 2}},
+		moveT{{2, 0}, {2, 1}},
+		moveT{{2, 1}, {2, 2}},
 	}
 }
 
 func setUpMoveRightNewTileCandidates() []positionT {
-	return []positionT{
-		positionT{1, 0},
-		positionT{2, 0},
-		positionT{3, 0},
-		positionT{3, 1},
-		positionT{3, 2},
-		positionT{3, 3},
-	}
+	return []positionT{{1, 0}, {2, 0}, {3, 0}, {3, 1}, {3, 2}, {3, 3}}
 }
 
 func setUpMoveRightNonMovedTiles() []positionT {
-	return []positionT{
-		positionT{0, 0},
-		positionT{0, 1},
-		positionT{0, 2},
-		positionT{0, 3},
-	}
+	return []positionT{{0, 0}, {0, 1}, {0, 2}, {0, 3}}
 }
 
 func setUpMoveRightMergeMoves() []moveValueT {
-	return []moveValueT{
-		moveValueT{
-			Move: moveT{
-				positionT{1, 1},
-				positionT{1, 2},
-			},
-			Value: 4},
-	}
+	return []moveValueT{{moveT{{1, 1}, {1, 2}}, 4}}
 }
 
 func setUpMoveRightRandomTile() (randomTile []positionValueT) {
-	return []positionValueT{
-		positionValueT{
-			Position: positionT{1, 1},
-			Value:    2,
-		},
-	}
+	return []positionValueT{{positionT{1, 1}, 2}}
 }
 
 func setUpMoveRightDirection() string {
@@ -140,16 +116,6 @@ func setUpRightMoveHarness() Move {
 
 }
 
-func setUpRightMove() Move {
-	return Move{
-		Direction:  setUpMoveRightDirection(),
-		Seed:       setUpMoveRightSeed(),
-		IsGameOver: setUpMoveIsGameOver(),
-		RoundNo:    setUpMoveRightRoundNo(),
-	}
-
-}
-
 // This test is a simple assertion to watch the Move struct, which a lot of
 // infrastructure (database, client) rely on. If the struct changes, or more
 // precisely, if struct jsonification changes, then this test should fail
@@ -164,6 +130,31 @@ func TestJsonMarshalling(t *testing.T) {
 	}
 }
 
+func TestIterator(t *testing.T) {
+	board := setUpMoveRightOldBoard()
+	iter := boardIterator(board, "right")
+	var boardIndex boardIndexT
+	var err error
+	expectedCurrentIndex := [][2]int{{0, 3}, {0, 2}, {0, 1}, {0, 0}, {1, 3},
+		{1, 2}, {1, 1}, {1, 0}, {2, 3}, {2, 2}, {2, 1}, {2, 0}, {3, 3}, {3, 2},
+		{3, 1}}
+	expectedNextIndex := [][2]int{{0, 2}, {0, 1}, {0, 0}, {1, 3},
+		{1, 2}, {1, 1}, {1, 0}, {2, 3}, {2, 2}, {2, 1}, {2, 0}, {3, 3}, {3, 2},
+		{3, 1}, {3, 0}}
+	for i := 0; i < len(expectedCurrentIndex); i++ {
+		boardIndex, err = iter()
+		if err != nil {
+			t.Error(err)
+		}
+		if expectedCurrentIndex[i] != boardIndex.currentIndex {
+			t.Error("error at current index", i, expectedCurrentIndex[i])
+		}
+		if expectedNextIndex[i] != boardIndex.nextIndex {
+			t.Error("error at next index", i, expectedCurrentIndex[i])
+		}
+	}
+}
+
 // This test the first stage of the pipeline
 func TestComputeDistance(t *testing.T) {
 	move := CreateMove(
@@ -172,14 +163,41 @@ func TestComputeDistance(t *testing.T) {
 		setUpMoveRightRoundNo(),
 		setUpMoveRightSeed(),
 	)
-	distances, err := move.ComputeDistance()
-	if distances != [4][4]int{
-		[4]int{0, 0, 0, 0},
-		[4]int{2, 2, 1, 0},
-		[4]int{1, 1, 0, 0},
-		[4]int{0, 0, 0, 0},
-	} || err != nil {
-		t.Fail()
+	expected := [4][4]int{
+		{0, 0, 0, 0},
+		{2, 2, 1, 0},
+		{1, 1, 0, 0},
+		{3, 2, 1, 0},
+	}
+	distances, err := move.computeDistance()
+	if distances != expected {
+		t.Error(expected, "!=", distances)
+	}
+	if err != nil {
+		t.Error(err, "is not nil")
+	}
+
+}
+
+// This test exposes a bug, which slipped through to master.
+func TestComputeDistanceLastRow(t *testing.T) {
+	move := CreateMove(
+		[BoardSize][BoardSize]int{
+			{0, 0, 0, 0},
+			{0, 0, 0, 0},
+			{0, 0, 0, 0},
+			{2, 0, 0, 0},
+		},
+		setUpMoveRightDirection(),
+		setUpMoveRightRoundNo(),
+		setUpMoveRightSeed(),
+	)
+	distances, err := move.computeDistance()
+	if distances[0][0] != 3 {
+		t.Error("distances should be 3")
+	}
+	if err != nil {
+		t.Error(err, "is not nil")
 	}
 
 }
@@ -188,7 +206,7 @@ func TestComputeDistance(t *testing.T) {
 // pipeline modifies a move struct from a given, non-specific point
 // appropriately.
 func TestMoveRight(t *testing.T) {
-  return
+	return
 	move := CreateMove(
 		setUpMoveRightOldBoard(),
 		setUpMoveRightDirection(),

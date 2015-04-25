@@ -16,22 +16,8 @@
 
 package main
 
-import "github.com/2048wc/2048wc/boardLib"
-import "fmt"
+//import "github.com/2048wc/2048wc/boardLib"
 
 func main() {
-  oldBoard := boardLib.BoardT{
-		[boardLib.BoardSize]int{16, 8, 4, 2},
-		[boardLib.BoardSize]int{4, 2, 2, 0},
-		[boardLib.BoardSize]int{2, 4, 0, 2},
-		[boardLib.BoardSize]int{0, 0, 0, 0},
-	}
-	move := boardLib.CreateMove(
-		oldBoard,
-		"right",
-                24,
-		"e9ccc20fdb924ed423ad1b46c6df43516685f4c2bc36e202ad467af1b1d1febf",
-	)
-	fmt.Println(move.ComputeDistance())
-	
+	return
 }

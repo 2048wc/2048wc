@@ -36,15 +36,18 @@ type moveValueT struct {
 }
 
 // This is the struct, which is going to be both
-// used on the front end to do board animation,
+// used on the frontend to do board animation,
 // and on the backend for future replays.
+// both fronted and backend json views of this struct
+// are going to look the same, apart from
+// dropping the Seed field from the client view
+// for security reasons.
 type Move struct {
 	//These are created by the constructor
 	Direction string
 	RoundNo   int
 	Seed      string
 	OldBoard  BoardT
-
 	//These are computed by the move pipeline
 	NewBoard          BoardT
 	NonMergeMoves     []moveT
@@ -72,28 +75,28 @@ func (move *Move) ExecuteMove() {
 	return
 }
 
-func (move *Move) directions(direction string) (
-	initialIndex,
-	smallStep,
+func directions(direction string) (
+	initialIndex positionT,
+	smallStep [2]int,
 	bigStep [2]int) {
 
 	if direction == "left" {
-		initialIndex = [2]int{0, 0}
+		initialIndex = positionT{0, 0}
 		smallStep = [2]int{0, 1}
 		bigStep = [2]int{1, -BoardSize + 1}
 
 	} else if direction == "right" {
-		initialIndex = [2]int{0, BoardSize - 1}
+		initialIndex = positionT{0, BoardSize - 1}
 		smallStep = [2]int{0, -1}
 		bigStep = [2]int{1, BoardSize - 1}
 
 	} else if direction == "down" {
-		initialIndex = [2]int{BoardSize - 1, 0}
+		initialIndex = positionT{BoardSize - 1, 0}
 		smallStep = [2]int{-1, 0}
 		bigStep = [2]int{BoardSize - 1, 1}
 
 	} else if direction == "up" {
-		initialIndex = [2]int{0, 0}
+		initialIndex = positionT{0, 0}
 		smallStep = [2]int{1, 0}
 		bigStep = [2]int{-BoardSize + 1, 1}
 
@@ -113,32 +116,78 @@ func init() {
 	allowedMoves["down"] = true
 }
 
-func (move *Move) ComputeDistance() (distance BoardT, err error) {
-	if !allowedMoves[move.Direction] {
-		err = errors.New("has to be left, right, up or down.")
+func boardValue(board BoardT, position positionT) int {
+	return board[position[0]][position[1]]
+}
+
+func (position *positionT) nextPosition(stepSize [2]int, numberOfSteps int) {
+	position[0] = position[0] + stepSize[0]*numberOfSteps
+	position[1] = position[1] + stepSize[1]*numberOfSteps
+}
+
+//a struct to represent a unit of iteration over the board.
+type boardIndexT struct {
+	currentIndex positionT
+	nextIndex    positionT
+	currentValue int
+	nextValue    int
+	newPass      bool
+}
+
+func boardIterator(board BoardT, direction string) (
+	iterator func() (boardIndex boardIndexT, err error)) {
+
+	var boardIndex boardIndexT
+	initialIndex, smallStep, bigStep := directions(direction)
+	boardIndex.nextIndex = initialIndex
+
+	var iter int
+	var innerIter int
+
+	var makeSteps = func() (err error) {
+		if innerIter < BoardSize-1 {
+			innerIter += 1
+			boardIndex.nextIndex.nextPosition(smallStep, 1)
+			boardIndex.newPass = false
+		} else if iter < BoardSize-1 {
+			innerIter = 0
+			iter += 1
+			boardIndex.nextIndex.nextPosition(bigStep, 1)
+			boardIndex.newPass = true
+		} else {
+			err = errors.New("iterator out of bonds")
+		}
 		return
 	}
-	initialIndex, smallStep, bigStep := move.directions(move.Direction)
-	currentIndex := initialIndex
-	for i := 0; i < BoardSize - 1; i++ {
-		for ii := 0; ii < BoardSize - 1; ii++ {
-			currentValue := move.OldBoard[currentIndex[0]][currentIndex[1]]
-			currentDistance := distance[currentIndex[0]][currentIndex[1]]
-
-			currentIndex[0] += smallStep[0]
-			currentIndex[1] += smallStep[1]
-
-			nextValue := move.OldBoard[currentIndex[0]][currentIndex[1]]
-			if currentValue == 0 || currentValue == nextValue {
-				distance[currentIndex[0]][currentIndex[1]] = 1 + currentDistance
-			} else {
-				distance[currentIndex[0]][currentIndex[1]] = currentDistance
-			}
-		}
-		currentIndex[0] += bigStep[0]
-		currentIndex[1] += bigStep[1]
+	iterator = func() (boardIndexT, error) {
+		boardIndex.currentIndex = boardIndex.nextIndex
+		boardIndex.currentValue = boardValue(board, boardIndex.currentIndex)
+		err := makeSteps()
+		boardIndex.nextValue = boardValue(board, boardIndex.nextIndex)
+		return boardIndex, err
 	}
 	return
+}
+
+func (move *Move) computeDistance() (BoardT, error) {
+	var distance BoardT
+	iterator := boardIterator(move.OldBoard, move.Direction)
+	for i := 0; i < BoardSize*BoardSize-1; i++ {
+		ii, err := iterator()
+		if err != nil {
+			return distance, err
+		}
+		currentDistance := distance[ii.currentIndex[0]][ii.currentIndex[1]]
+		if ii.newPass == true {
+			currentDistance = 0
+		}
+		if ii.currentValue == 0 || ii.currentValue == ii.nextValue {
+			distance[ii.nextIndex[0]][ii.nextIndex[1]] = 1 + currentDistance
+		} else {
+			distance[ii.nextIndex[0]][ii.nextIndex[1]] = currentDistance
+		}
+	}
+	return distance, nil
 }
 
 // TODO implement, and cover with a test case,
