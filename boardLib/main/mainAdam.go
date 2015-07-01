@@ -16,8 +16,22 @@
 
 package main
 
-//import "github.com/2048wc/2048wc/boardLib"
-
+import "../../boardLib"
+import "fmt"
 func main() {
-	return
+	move := boardLib.CreateMove(
+		[boardLib.BoardSize][boardLib.BoardSize]int{
+			{16, 8, 4, 2},
+			{4, 2, 2, 0},
+			{2, 4, 0, 2},
+			{2, 0, 0, 0},
+		},
+		"down",
+		20,
+		"e9ccc20fdb924ed423ad1b46c6df43516685f4c2bc36e202ad467af1b1d1febf",
+	)
+	boardLib.PrintBoard(move.OldBoard)
+	move.ExecuteMove()
+	fmt.Println(move)
+	boardLib.PrintBoard(move.NewBoard)
 }
