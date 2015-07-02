@@ -24,8 +24,14 @@ import "encoding/json"
 import "log"
 import "io"
 import "../boardLib"
+import "time"
 
-func Init() {
+
+func delayMiliseconds(n time.Duration) {
+	time.Sleep(n * time.Millisecond)
+}
+
+func Init() (int){
 	move := boardLib.CreateMove(boardLib.BoardT{
 		{0,0,0,1},
 		{0,2,3,4}, 
@@ -35,16 +41,38 @@ func Init() {
 	move.ExecuteMove()
 	jsonified, _ := json.Marshal(move)
 	fmt.Println(string(jsonified))
+	
+	wait_time := 50
+	isDBconnected := false
+	
 	client, err := redis.Dial("tcp", "localhost:6379")
 	if err != nil {
-		// handle err
-		fmt.Println("in init: can't connect")
+		isDBconnected = true
+	}else {
+		delayMiliseconds(time.Duration(wait_time))
+		for i := 0; i<3; i++ {
+			client, err = redis.Dial("tcp", "localhost:6379")
+			if err != nil {
+				// handle err
+				fmt.Println("in init: can't connect")
+				wait_time := wait_time*2
+				delayMiliseconds(time.Duration(wait_time))
+			} else {
+				isDBconnected = true
+				break
+			}
+		}
 	}
-
-	client.Cmd("DEL", "queryBuilder::Iva").Str()
-	client.Cmd("RPUSH", "queryBuilder::Iva", `{"RoundNo":17, "direction":"left"}`).Str()
-	client.Cmd("RPUSH", "queryBuilder::Iva", "17").Int()
-	client.Close()
+	if isDBconnected {
+		client.Cmd("DEL", "queryBuilder::Iva").Str()
+		client.Cmd("RPUSH", "queryBuilder::Iva", `{"RoundNo":17, "direction":"left"}`).Str()
+		client.Cmd("RPUSH", "queryBuilder::Iva", "17").Int()
+		client.Close()
+		return 0
+	} else {
+		fmt.Println("Couldn't connect to the database. Try again later.")
+	}
+	return -1
 }
 
 // returns the current length of the list:

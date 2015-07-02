@@ -22,11 +22,15 @@ import "fmt"
 
 func main() {
 	
-	queryBuilder.Init()
-	length := queryBuilder.ListLen()
-	fmt.Println(length)
-	number, roundNo, direction := queryBuilder.ReadJson()
-	fmt.Println("1: ", number)
-	fmt.Println("2: ", roundNo)
-	fmt.Println("3: ", direction)
+	returned := queryBuilder.Init()
+	if returned == 0 {
+		length := queryBuilder.ListLen()
+		fmt.Println(length)
+		number, roundNo, direction := queryBuilder.ReadJson()
+		fmt.Println("1: ", number)
+		fmt.Println("2: ", roundNo)
+		fmt.Println("3: ", direction)
+	} else {
+		fmt.Println("couldn't connect to the database")
+	}
 }
