@@ -20,13 +20,9 @@ import "testing"
 import "encoding/json"
 import "log"
 
-//import "reflect"
-
-//import "reflect"
-
 // test that the board is an n by n iterable where all elements are 0
 func testBoardInitialised(t *testing.T) {
-	var board BoardT
+	var board boardT
 	for i := 0; i < BoardSize; i++ {
 		for j := 0; j < BoardSize; j++ {
 			if board[i][j] != 0 {
@@ -36,6 +32,10 @@ func testBoardInitialised(t *testing.T) {
 	}
 }
 
+type moveTest struct{
+	harness moveT
+	result moveT
+}
 // we will mostly likely only use board size of 4. If one day
 // we decide otherwise, we can update the test
 func testBoardSize(t *testing.T) {
@@ -44,7 +44,7 @@ func testBoardSize(t *testing.T) {
 	}
 }
 
-func setUpMoveRightOldBoard() (oldBoard BoardT) {
+func setUpMoveRightOldBoard() (oldBoard boardT) {
 	oldBoard = [BoardSize][BoardSize]int{
 		{16, 8, 4, 2},
 		{4, 2, 2, 0},
@@ -54,7 +54,7 @@ func setUpMoveRightOldBoard() (oldBoard BoardT) {
 	return
 }
 
-func setUpMoveRightNewBoard() BoardT {
+func setUpMoveRightNewBoard() boardT {
 	return [BoardSize][BoardSize]int{
 		{16, 8, 4, 2},
 		{0, 0, 4, 4},
@@ -63,12 +63,12 @@ func setUpMoveRightNewBoard() BoardT {
 	}
 }
 
-func setUpMoveRightNonMergedMoves() []moveT {
-	return []moveT{
-		moveT{{1, 0}, {1, 2}},
-		moveT{{2, 1}, {2, 2}},
-		moveT{{2, 0}, {2, 1}},
-		moveT{{3, 0}, {3, 3}},
+func setUpMoveRightNonMergedMoves() []nonMergeMoveT {
+	return []nonMergeMoveT{
+		nonMergeMoveT{{1, 0}, {1, 2}},
+		nonMergeMoveT{{2, 1}, {2, 2}},
+		nonMergeMoveT{{2, 0}, {2, 1}},
+		nonMergeMoveT{{3, 0}, {3, 3}},
 	}
 }
 
@@ -81,7 +81,7 @@ func setUpMoveRightNonMovedTiles() []positionT {
 }
 
 func setUpMoveRightMergeMoves() []mergeMoveT {
-	return []mergeMoveT{mergeMoveT{moveT{{1, 2}, {1, 1}}, positionT{1, 3}, 4}}
+	return []mergeMoveT{mergeMoveT{nonMergeMoveT{{1, 2}, {1, 1}}, positionT{1, 3}, 4}}
 }
 
 func setUpMoveRightRandomTile() (randomTile []positionValueT) {
@@ -104,8 +104,8 @@ func setUpMoveIsGameOver() bool {
 	return false
 }
 
-func setUpRightMoveHarness() Move {
-	return Move{
+func setUpRightMoveHarness() moveT {
+	return moveT{
 		Direction:         setUpMoveRightDirection(),
 		Seed:              setUpMoveRightSeed(),
 		IsGameOver:        setUpMoveIsGameOver(),
@@ -142,14 +142,15 @@ func testJsonMarshalling(t *testing.T) {
 }
 
 func testPopulateNewBoard(t *testing.T) {
-	move := CreateMove(
+	var move moveT
+	move.InitNextMove(
 		setUpMoveRightOldBoard(),
 		setUpMoveRightDirection(),
 		setUpMoveRightRoundNo(),
 		setUpMoveRightSeed(),
 	)
 	expected := setUpMoveRightNewBoard()
-	move.ExecuteMove()
+	move.ResolveMove()
 	if (&move).NewBoard != expected {
 		t.Error(expected, "!=", (&move).NewBoard)
 	}
@@ -165,7 +166,8 @@ type executeMoveUnitTest struct {
 }
 
 func TestMoveRight(t *testing.T) {
-	move := CreateMove(
+	var move moveT
+	move.InitNextMove(
 		[BoardSize][BoardSize]int{
 		{16, 8, 4, 2},
 		{4, 2, 2, 0},
@@ -176,7 +178,7 @@ func TestMoveRight(t *testing.T) {
 		24,
 		"e9ccc20fdb924ed423ad1b46c6df43516685f4c2bc36e202ad467af1b1d1febf",
 	)
-	move.ExecuteMove()
+	move.ResolveMove()
 	moveHarness := setUpRightMoveHarness()
 	v1, _ := json.Marshal(moveHarness)
 	v2, _ := json.Marshal(move)

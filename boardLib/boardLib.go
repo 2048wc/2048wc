@@ -17,7 +17,7 @@
 package boardLib
 
 // import "encoding/json"
-import "fmt"
+//import "fmt"
 
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.
@@ -26,40 +26,75 @@ const BoardSize = 4
 var allowedMoves map[string]bool = map[string]bool{"left": true, "right": true,
 	"up": true, "down": true}
 
-type BoardT [BoardSize][BoardSize]int
+type boardT [BoardSize][BoardSize]int
 type positionT [2]int
 type positionValueT struct {
 	Position positionT
 	Value    int
 }
-type moveT [2]positionT
+
+type nonMergeMoveT [2]positionT
 type mergeMoveT struct {
-	From  moveT
+	From  nonMergeMoveT
 	To    positionT
 	Value int
 }
 
-// This is the struct, which is going to be both
+func CreateMove() Move {
+	return &moveT{}
+}
+
+type Move interface {
+	InitFirstMove()
+	InitNextMove(oldBoard [BoardSize][BoardSize]int, direction string, roundNo int, seed string)
+	ValidateMove() (success bool)
+	ResolveMove() 
+	InternalView() (json string)
+	ExternalView() (json string)
+	ParseMove(string) 
+	GetRoundNo() int
+}
+
+// The json view of this struct is going to be both
 // used on the frontend to do board animation,
 // and on the backend for future replays.
 // both fronted and backend json views of this struct
 // are going to look the same, apart from
 // dropping the Seed field from the client view
 // for security reasons.
-type Move struct {
+type moveT struct {
 	//You are responsible for initialising those
 	Direction string
 	RoundNo   int
 	Seed      string
-	OldBoard  BoardT
-	//These are going to be computed by the move pipeline
-	NewBoard          BoardT
-	NonMergeMoves     []moveT
+	OldBoard  boardT
+	// Resolved by firstPass
+	NewBoard          boardT
+	NonMergeMoves     []nonMergeMoveT
 	MergeMoves        []mergeMoveT
 	NonMovedTiles     []positionT
+	// Resolved by secondPass
 	NewTileCandidates []positionT
-	RandomTiles       []positionValueT
 	IsGameOver        bool
+	// Resolved by addRandomTile
+	RandomTiles       []positionValueT
+}
+
+
+func (move *nonMergeMoveT) ExternalView() string{
+	return ""
+}
+
+func (move *moveT) GetRoundNo() int{
+	return move.RoundNo
+}
+
+func (move *moveT) ParseMove(string){
+	return 
+}
+
+func (move *moveT) ValidateMove() bool{
+	return true
 }
 
 // Direction is either "left", "right", "up" or "down"
@@ -67,63 +102,60 @@ type Move struct {
 // Seed represents a 256 bit number encoded as 64 character long hex number.
 // OldBoard represents a board to evaluate
 // TODO validate values
-func CreateMove(oldBoard BoardT,
+func (move *moveT) InitNextMove(oldBoard [BoardSize][BoardSize]int,
 	direction string,
 	roundNo int,
-	seed string) (move Move) {
+	seed string) {
 	move.Direction = direction
 	move.Seed = seed
 	move.OldBoard = oldBoard
 	move.RoundNo = roundNo
-	move.NonMergeMoves = make([]moveT, 0, BoardSize*BoardSize)
+	move.initMoveCollections()
+	return
+}
+
+func (move *moveT) InitFirstMove() {
+	move.initMoveCollections()
+	return
+}
+
+func (move *moveT) InternalView() string{
+	return ""
+}
+
+func (move *moveT) ExternalView() string{
+	return ""
+}
+
+func (move *moveT) initMoveCollections(){	
+	move.NonMergeMoves = make([]nonMergeMoveT, 0, BoardSize*BoardSize)
 	move.MergeMoves = make([]mergeMoveT, 0, BoardSize*BoardSize)
 	move.NonMovedTiles = make([]positionT, 0, BoardSize*BoardSize)
 	move.NewTileCandidates = make([]positionT, 0, BoardSize*BoardSize)
 	move.RandomTiles = make([]positionValueT, 0, BoardSize*BoardSize)
-	return
-}
+}	
 
-func (board *BoardT) get(position positionT) int {
+func (board *boardT) get(position positionT) int {
 	return board[position[0]][position[1]]
 }
 
-func (board *BoardT) set(position positionT, value int) {
+func (board *boardT) set(position positionT, value int) {
 	board[position[0]][position[1]] = value
 	return
 }
 
-func (board *BoardT) add(position positionT, value int) int {
-	board[position[0]][position[1]] += value
-	return board[position[0]][position[1]]
-}
 
 //TODO implement to exlude wrong seeds, wrong directions, etc.
-func (move *Move) validateBoardInitialisation() {
+func (move *moveT) validateBoardInitialisation() {
 	return
 }
 
 //TODO checks if game is over
-func (move *Move) isGameOver() bool {
+func (move *moveT) isGameOver() bool {
 	return false
 }
 
-func invertDirection(direction string) string {
-	if direction == "up" {
-		return "down"
-	}
-	if direction == "down" {
-		return "up"
-	}
-	if direction == "left" {
-		return "right"
-	}
-	if direction == "right" {
-		return "left"
-	}
-	return ""
-}
-
-type IterationStateMachine struct {
+type iterationStateMachine struct {
 	// These are assigned by setDirections
 	smallStepForward  [2]int
 	smallStepBackward [2]int
@@ -139,7 +171,7 @@ type IterationStateMachine struct {
 	currentIndex positionT
 }
 
-func (ism *IterationStateMachine) setDirections(direction string) {
+func (ism *iterationStateMachine) setDirections(direction string) {
 	if direction == "right" {
 		ism.currentIndex = positionT{0, BoardSize - 1}
 		ism.smallStepForward = [2]int{0, 1}
@@ -169,18 +201,16 @@ func (position *positionT) nextPosition(stepSize [2]int, numberOfSteps int) {
 	position[1] = position[1] + stepSize[1]*numberOfSteps
 }
 
-func (newboard *BoardT) incrementFromBySteps(oldboard *BoardT,
+func (newboard *boardT) incrementFromBySteps(oldboard *boardT,
 	incrementFrom positionT, step [2]int, numberOfSteps int) (int, positionT) {
-	value := oldboard[incrementFrom[0]][incrementFrom[1]]
+	value := oldboard.get(incrementFrom)
 	row := incrementFrom[0] + step[0]*numberOfSteps
 	column := incrementFrom[1] + step[1]*numberOfSteps
 	newboard[row][column] += value
-	var tusia = 0
-	tusia = tusia
 	return newboard[row][column], positionT{row, column}
 }
 
-func (move *Move) resolveBoardAtIndex(ism *IterationStateMachine) {
+func (move *moveT) resolveBoardAtIndex(ism *iterationStateMachine) {
 	giveHope := func() {
 		_, position := move.NewBoard.incrementFromBySteps(&move.OldBoard,
 			ism.currentIndex, ism.smallStepForward, ism.distance)
@@ -204,14 +234,14 @@ func (move *Move) resolveBoardAtIndex(ism *IterationStateMachine) {
 			move.NonMovedTiles = append(move.NonMovedTiles, ism.mergeHopefulIndex)
 		} else {
 			move.NonMergeMoves = append(move.NonMergeMoves,
-				moveT{ism.mergeHopefulIndex, ism.mergeHopefulDestination})
+				nonMergeMoveT{ism.mergeHopefulIndex, ism.mergeHopefulDestination})
 		}
 	}
 	completeMerge := func() {
 		ism.distance += 1
 		value, position := move.NewBoard.incrementFromBySteps(&move.OldBoard,
 			ism.currentIndex, ism.smallStepForward, ism.distance)
-		fromMoves := moveT{ism.mergeHopefulIndex, ism.currentIndex}
+		fromMoves := nonMergeMoveT{ism.mergeHopefulIndex, ism.currentIndex}
 		mergeMove := mergeMoveT{From: fromMoves,
 			To:    position,
 			Value: value}
@@ -242,9 +272,8 @@ func (move *Move) resolveBoardAtIndex(ism *IterationStateMachine) {
 	}
 }
 
-//TODO implement to satisfy the TDD test case
-func (move *Move) ExecuteMove() error {
-	var ism IterationStateMachine
+func (move *moveT) firstPass(){
+	var ism iterationStateMachine
 	ism.setDirections(move.Direction)
 	for i := 0; i < BoardSize; i++ {
 		ism.distance = 0
@@ -260,24 +289,23 @@ func (move *Move) ExecuteMove() error {
 			ism.currentIndex.nextPosition(ism.bigStep, 1)
 		/*}*/
 	}
-	move.RoundNo += 1
-	return nil
 }
 
-// TODO implement, and cover with a test case,
-// perhaps smarter than the current marshalling test case
-func (move *Move) Marshal() (jsonified string) {
-	return ""
+//TODO implement to satisfy the TDD test case
+func (move *moveT) ResolveMove() {
+	move.firstPass()
+	move.RoundNo += 1
+	return
 }
 
 // This might be useful for logging/ command line interface.
 // For the database we'll have to use a different function that's
 // going to return json.
-func PrintBoard(board BoardT) {
+/*func PrintBoard(board boardT) {
 	for _, row := range board {
 		for _, value := range row {
 			fmt.Print(value, " ")
 		}
 		fmt.Println("")
 	}
-}
+}*/
