@@ -45,13 +45,15 @@ func CreateMove() Move {
 }
 
 type Move interface {
+	//this describes initFirstMove
 	InitFirstMove()
-	InitNextMove(oldBoard [BoardSize][BoardSize]int, direction string, roundNo int, seed string)
+	InitNextMove(oldBoard [BoardSize][BoardSize]int,
+		direction string, roundNo int, seed string)
 	ValidateMove() (success bool)
-	ResolveMove() 
+	ResolveMove()
 	InternalView() (json string)
 	ExternalView() (json string)
-	ParseMove(string) 
+	ParseMove(string) error
 	GetRoundNo() int
 }
 
@@ -69,31 +71,30 @@ type moveT struct {
 	Seed      string
 	OldBoard  boardT
 	// Resolved by firstPass
-	NewBoard          boardT
-	NonMergeMoves     []nonMergeMoveT
-	MergeMoves        []mergeMoveT
-	NonMovedTiles     []positionT
+	NewBoard      boardT
+	NonMergeMoves []nonMergeMoveT
+	MergeMoves    []mergeMoveT
+	NonMovedTiles []positionT
 	// Resolved by secondPass
 	NewTileCandidates []positionT
 	IsGameOver        bool
 	// Resolved by addRandomTile
-	RandomTiles       []positionValueT
+	RandomTiles []positionValueT
 }
 
-
-func (move *nonMergeMoveT) ExternalView() string{
+func (move *nonMergeMoveT) ExternalView() string {
 	return ""
 }
 
-func (move *moveT) GetRoundNo() int{
+func (move *moveT) GetRoundNo() int {
 	return move.RoundNo
 }
 
-func (move *moveT) ParseMove(string){
-	return 
+func (move *moveT) ParseMove(string) error {
+	return nil
 }
 
-func (move *moveT) ValidateMove() bool{
+func (move *moveT) ValidateMove() bool {
 	return true
 }
 
@@ -103,15 +104,12 @@ func (move *moveT) ValidateMove() bool{
 // OldBoard represents a board to evaluate
 // TODO validate values
 func (move *moveT) InitNextMove(oldBoard [BoardSize][BoardSize]int,
-	direction string,
-	roundNo int,
-	seed string) {
+	direction string, roundNo int, seed string) {
 	move.Direction = direction
 	move.Seed = seed
 	move.OldBoard = oldBoard
 	move.RoundNo = roundNo
 	move.initMoveCollections()
-	return
 }
 
 func (move *moveT) InitFirstMove() {
@@ -119,21 +117,21 @@ func (move *moveT) InitFirstMove() {
 	return
 }
 
-func (move *moveT) InternalView() string{
+func (move *moveT) InternalView() string {
 	return ""
 }
 
-func (move *moveT) ExternalView() string{
+func (move *moveT) ExternalView() string {
 	return ""
 }
 
-func (move *moveT) initMoveCollections(){	
+func (move *moveT) initMoveCollections() {
 	move.NonMergeMoves = make([]nonMergeMoveT, 0, BoardSize*BoardSize)
 	move.MergeMoves = make([]mergeMoveT, 0, BoardSize*BoardSize)
 	move.NonMovedTiles = make([]positionT, 0, BoardSize*BoardSize)
 	move.NewTileCandidates = make([]positionT, 0, BoardSize*BoardSize)
 	move.RandomTiles = make([]positionValueT, 0, BoardSize*BoardSize)
-}	
+}
 
 func (board *boardT) get(position positionT) int {
 	return board[position[0]][position[1]]
@@ -141,9 +139,7 @@ func (board *boardT) get(position positionT) int {
 
 func (board *boardT) set(position positionT, value int) {
 	board[position[0]][position[1]] = value
-	return
 }
-
 
 //TODO implement to exlude wrong seeds, wrong directions, etc.
 func (move *moveT) validateBoardInitialisation() {
@@ -193,7 +189,6 @@ func (ism *iterationStateMachine) setDirections(direction string) {
 		ism.smallStepBackward = [2]int{-1, 0}
 		ism.bigStep = [2]int{BoardSize - 1, 1}
 	}
-	return
 }
 
 func (position *positionT) nextPosition(stepSize [2]int, numberOfSteps int) {
@@ -272,7 +267,7 @@ func (move *moveT) resolveBoardAtIndex(ism *iterationStateMachine) {
 	}
 }
 
-func (move *moveT) firstPass(){
+func (move *moveT) firstPass() {
 	var ism iterationStateMachine
 	ism.setDirections(move.Direction)
 	for i := 0; i < BoardSize; i++ {
@@ -285,15 +280,18 @@ func (move *moveT) firstPass(){
 			}
 			move.resolveBoardAtIndex(&ism)
 		}
-		/*if i != BoardSize {*/
-			ism.currentIndex.nextPosition(ism.bigStep, 1)
-		/*}*/
+		ism.currentIndex.nextPosition(ism.bigStep, 1)
 	}
+}
+
+func (move *moveT) secondPass() {
+
 }
 
 //TODO implement to satisfy the TDD test case
 func (move *moveT) ResolveMove() {
 	move.firstPass()
+	move.secondPass()
 	move.RoundNo += 1
 	return
 }
