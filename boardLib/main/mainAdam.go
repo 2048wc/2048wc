@@ -16,10 +16,51 @@
 
 package main
 
-import "../../boardLib"
+//import "../../boardLib"
 import "fmt"
+import "reflect"
+import "encoding/json"
+
+func MarshalOnlyFields(structa interface{},
+	includeFields map[string]bool) (jsona []byte, status error) {
+	value := reflect.ValueOf(structa)
+	typa := reflect.TypeOf(structa)
+	size := value.NumField()
+	jsona = append(jsona, '{')
+	for i := 0; i < size; i++ {
+		structValue := value.Field(i)
+		var fieldName string = typa.Field(i).Name
+		if marshalledField, marshalStatus := json.Marshal((structValue).Interface()); marshalStatus != nil {
+			return []byte{}, marshalStatus
+		} else {
+			if includeFields[fieldName] {
+				jsona = append(jsona, '"')
+				jsona = append(jsona, []byte(fieldName)...)
+				jsona = append(jsona, '"')
+				jsona = append(jsona, ':')
+				jsona = append(jsona, (marshalledField)...)
+				if i+1 != len(includeFields) {
+					jsona = append(jsona, ',')
+				}
+			}
+		}
+	}
+	jsona = append(jsona, '}')
+	return
+}
+
+type magic struct {
+	Magic1 int
+	Magic2 string
+	Magic3 [2]int
+}
 
 func main() {
-	
+	var magic = magic{0, "tusia", [2]int{0, 1}}
+	if json, status := MarshalOnlyFields(magic, map[string]bool{"Magic1": true}); status != nil {
+
+	} else {
+		fmt.Println(string(json))
+	}
 
 }

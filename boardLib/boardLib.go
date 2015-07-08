@@ -16,8 +16,10 @@
 
 package boardLib
 
-// import "encoding/json"
-//import "fmt"
+import "encoding/json"
+import "reflect"
+import "math/big"
+import "crypto"
 
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.
@@ -45,16 +47,37 @@ func CreateMove() Move {
 }
 
 type Move interface {
-	//this describes initFirstMove
+	// This initialises all the fields with sensible defaults for the first
+	// move. This includes 2 random tiles, a random seed, a non-zero round
+	// number, a valid direction and non-nil pointers on all datastructures.
+	// It makes it safe to call other functions on the initialised type.
 	InitFirstMove()
+	// Like InitFirstMove, but with more control over the initial conditions of
+	// a particular move.
 	InitNextMove(oldBoard [BoardSize][BoardSize]int,
 		direction string, roundNo int, seed string)
-	ValidateMove() (success bool)
+	// Sets direction to a given string. Allowed directions are left, right,
+	// down, up. Call ValidateMove afterwards to make sure that the struct is 
+	// still in acceptable state.
+	SetDirection(string)
+	// Checks if move fields are satisfy correctness constraints. Should be
+	// called before ResolveMove. Returns a map of fields names onto errors for
+	// incorrectly valued fields.
+	ValidateMove() (map[string]error)
+	// Evolves board one step forward. Call ValidateMove beforehand.
 	ResolveMove()
+	// Internal json representation of the struct. Do not show to the client!
+	// Exports confidential fields.
 	InternalView() (json string)
+	// External json representation. Safe to share with the client.
 	ExternalView() (json string)
-	ParseMove(string) error
+	// Init the board using a json passed in as a string. Call ValidateMove
+	// after this function.
+	ParseMove(json string) error
+	// Get Round Number, which is simultanously a score.
 	GetRoundNo() int
+	// Get the status of the game.
+	GetGameOver() bool
 }
 
 // The json view of this struct is going to be both
@@ -68,7 +91,7 @@ type moveT struct {
 	//You are responsible for initialising those
 	Direction string
 	RoundNo   int
-	Seed      string
+	Seed      big.Int
 	OldBoard  boardT
 	// Resolved by firstPass
 	NewBoard      boardT
@@ -78,24 +101,65 @@ type moveT struct {
 	// Resolved by secondPass
 	NewTileCandidates []positionT
 	IsGameOver        bool
-	// Resolved by addRandomTile
-	RandomTiles []positionValueT
+	RandomTiles       []positionValueT
 }
 
-func (move *nonMergeMoveT) ExternalView() string {
-	return ""
+func marshalExcludeFields(structa interface{},
+	excludeFields map[string]bool) (jsona []byte, status error) {
+	value := reflect.ValueOf(structa)
+	typa := reflect.TypeOf(structa)
+	size := value.NumField()
+	jsona = append(jsona, '{')
+	for i := 0; i < size; i++ {
+		structValue := value.Field(i)
+		var fieldName string = typa.Field(i).Name
+		if marshalledField, marshalStatus := json.Marshal((structValue).Interface()); marshalStatus != nil {
+			return []byte{}, marshalStatus
+		} else {
+			if excludeFields[fieldName] == false {
+				jsona = append(jsona, '"')
+				jsona = append(jsona, []byte(fieldName)...)
+				jsona = append(jsona, '"')
+				jsona = append(jsona, ':')
+				jsona = append(jsona, (marshalledField)...)
+				if i != size-len(excludeFields) {
+					jsona = append(jsona, ',')
+				}
+			}
+		}
+	}
+	jsona = append(jsona, '}')
+	return
+}
+
+func (move *moveT) GetGameOver() bool {
+	return move.IsGameOver
+}
+
+func (move *moveT) SetDirection(string) {
+	return 
+}
+
+func (move *moveT) ExternalView() string {
+	jsona, _ := marshalExcludeFields(*move, map[string]bool{"Seed": true})
+	return string(jsona)
+}
+
+func (move *moveT) InternalView() string {
+	jsona, _ := json.Marshal(*move)
+	return string(jsona)
 }
 
 func (move *moveT) GetRoundNo() int {
 	return move.RoundNo
 }
 
-func (move *moveT) ParseMove(string) error {
-	return nil
+func (move *moveT) ParseMove(jsona string) error {
+	return json.Unmarshal([]byte(jsona), move)
 }
 
-func (move *moveT) ValidateMove() bool {
-	return true
+func (move *moveT) ValidateMove() map[string]error {
+	return nil
 }
 
 // Direction is either "left", "right", "up" or "down"
@@ -106,23 +170,17 @@ func (move *moveT) ValidateMove() bool {
 func (move *moveT) InitNextMove(oldBoard [BoardSize][BoardSize]int,
 	direction string, roundNo int, seed string) {
 	move.Direction = direction
-	move.Seed = seed
+	move.Seed.SetString(seed, 16)
 	move.OldBoard = oldBoard
 	move.RoundNo = roundNo
 	move.initMoveCollections()
 }
 
+
+//TODO
 func (move *moveT) InitFirstMove() {
 	move.initMoveCollections()
 	return
-}
-
-func (move *moveT) InternalView() string {
-	return ""
-}
-
-func (move *moveT) ExternalView() string {
-	return ""
 }
 
 func (move *moveT) initMoveCollections() {
@@ -267,6 +325,14 @@ func (move *moveT) resolveBoardAtIndex(ism *iterationStateMachine) {
 	}
 }
 
+func (move *moveT) rollSeed() {
+	hash := crypto.SHA3_256.New()
+	_, _ = hash.Write(move.Seed.Bytes())
+	var throwaway []byte 
+	move.Seed.SetBytes(hash.Sum(throwaway))
+	return
+} 
+
 func (move *moveT) firstPass() {
 	var ism iterationStateMachine
 	ism.setDirections(move.Direction)
@@ -288,9 +354,9 @@ func (move *moveT) secondPass() {
 
 }
 
-//TODO implement to satisfy the TDD test case
 func (move *moveT) ResolveMove() {
 	move.firstPass()
+	move.rollSeed()
 	move.secondPass()
 	move.RoundNo += 1
 	return

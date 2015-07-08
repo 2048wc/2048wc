@@ -242,5 +242,21 @@ func TestWrongDirection(t *testing.T) {
 		Direction: "theresnosuchdirection",
 	}
 	move.firstPass()
-	fmt.Println(move)
+}
+
+type magic struct {
+	Magic1 int
+	Magic2 string
+	Magic3 [2]int
+}
+
+func TestMarshalWithoutFields(t *testing.T) {
+	var magic = magic{0, "tusia", [2]int{0, 1}}
+	if json, status := marshalExcludeFields(magic, map[string]bool{"Magic1": true}); status != nil {
+		t.Error(`encoding/json failed`)
+	} else {
+		if string(json) != `{"Magic2":"tusia","Magic3":[0,1]}` {
+			t.Error("is: ", json, "should be: ", `{"Magic2":"tusia","Magic3":[0,1]}`)
+		}
+	}
 }
