@@ -17,9 +17,13 @@
 package boardLib
 
 import "encoding/json"
+import "encoding/hex"
 import "reflect"
 import "math/big"
-import "crypto"
+import "fmt"
+//import "errors"
+
+import "crypto/sha256"
 
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.
@@ -42,6 +46,7 @@ type mergeMoveT struct {
 	Value int
 }
 
+// Creates an empty Move. The move has to be then initialised using
 func CreateMove() Move {
 	return &moveT{}
 }
@@ -49,33 +54,52 @@ func CreateMove() Move {
 type Move interface {
 	// This initialises all the fields with sensible defaults for the first
 	// move. This includes 2 random tiles, a random seed, a non-zero round
-	// number, a valid direction and non-nil pointers on all datastructures.
-	// It makes it safe to call other functions on the initialised type.
+	// number, a valid direction and non-nil pointers for all internal data
+	// structures. After initialisation it is safe to call other functions on
+	// this struct.
 	InitFirstMove()
+
 	// Like InitFirstMove, but with more control over the initial conditions of
-	// a particular move.
-	InitNextMove(oldBoard [BoardSize][BoardSize]int,
+	InitMove(oldBoard [BoardSize][BoardSize]int,
 		direction string, roundNo int, seed string)
-	// Sets direction to a given string. Allowed directions are left, right,
-	// down, up. Call ValidateMove afterwards to make sure that the struct is 
+
+	// Init the board using a json passed in as a string. Call ValidateMove
+	// after this function.
+	ParseMove(json string)
+
+	// Sets direction of this move. Allowed directions are left, right,
+	// down, up. Call ValidateMove afterwards to make sure that the struct is
 	// still in acceptable state.
 	SetDirection(string)
-	// Checks if move fields are satisfy correctness constraints. Should be
-	// called before ResolveMove. Returns a map of fields names onto errors for
-	// incorrectly valued fields.
-	ValidateMove() (map[string]error)
-	// Evolves board one step forward. Call ValidateMove beforehand.
+
+	// Returns a new move newMove.OldBoard := oldMove.NewBoard, roundNo += 1,
+	// and the seed carried over.
+	CreateNextMove() Move
+
+	// Evolves board one step forward. Can put errors in ValidateMove.
+	// Call ValidateMove before and afterwards.
 	ResolveMove()
+
+	// Checks if move fields satisfy some basic constraints. Should be
+	// called before ResolveMove. Returns a map of field names onto errors for
+	// incorrectly valued fields. Both Resolved and Unresolved moves satisfy
+	// validation. Resolved moves return isResolved true. Move which doesn't
+	// progress the board is detected as an error in NewBoard.
+	ValidateMove() (isResolved bool, errors map[string]error)
+
 	// Internal json representation of the struct. Do not show to the client!
 	// Exports confidential fields.
 	InternalView() (json string)
+
 	// External json representation. Safe to share with the client.
 	ExternalView() (json string)
-	// Init the board using a json passed in as a string. Call ValidateMove
-	// after this function.
-	ParseMove(json string) error
+
 	// Get Round Number, which is simultanously a score.
 	GetRoundNo() int
+
+	// Get Seed
+	GetSeed() string
+
 	// Get the status of the game.
 	GetGameOver() bool
 }
@@ -87,6 +111,7 @@ type Move interface {
 // are going to look the same, apart from
 // dropping the Seed field from the client view
 // for security reasons.
+
 type moveT struct {
 	//You are responsible for initialising those
 	Direction string
@@ -104,8 +129,139 @@ type moveT struct {
 	RandomTiles       []positionValueT
 }
 
-func marshalExcludeFields(structa interface{},
-	excludeFields map[string]bool) (jsona []byte, status error) {
+type moveInternal struct {
+	//You are responsible for initialising those
+	Direction string
+	RoundNo   int
+	Seed      string
+	OldBoard  boardT
+	// Resolved by firstPass
+	NewBoard      boardT
+	NonMergeMoves []nonMergeMoveT
+	MergeMoves    []mergeMoveT
+	NonMovedTiles []positionT
+	// Resolved by secondPass
+	NewTileCandidates []positionT
+	IsGameOver        bool
+	RandomTiles       []positionValueT
+}
+
+func (move *moveT) GetGameOver() bool {
+	return move.IsGameOver
+}
+
+func (move *moveT) SetDirection(string) {
+	return
+}
+
+func (move *moveT) ExternalView() string {
+	jsona, err := marshalExcludeFields(*move, map[string]bool{"Seed": true})
+	//TODO put err into a map with errors
+	if err != nil{
+		return ""
+	}
+	return string(jsona)
+}
+
+func (move *moveT) InternalView() string {
+	var jsona []byte
+	value := reflect.ValueOf(*move)
+	typa := reflect.TypeOf(*move)
+	size := value.NumField()
+	jsona = append(jsona, '{')
+	for i := 0; i < size; i++ {
+		structValue := value.Field(i)
+		fieldName := typa.Field(i).Name
+		var marshalStatus error
+		var marshalledField []byte
+		if fieldName == "Seed"{
+			marshalledField, marshalStatus = json.Marshal(
+				move.GetSeed());
+			if marshalStatus != nil {
+				return ""
+			}
+		} else{
+			marshalledField, marshalStatus = json.Marshal(
+			(structValue).Interface())
+			if marshalStatus != nil {
+			return ""
+			}
+		}
+		jsona = append(jsona, '"')
+		jsona = append(jsona, []byte(fieldName)...)
+		jsona = append(jsona, '"')
+		jsona = append(jsona, ':')
+		jsona = append(jsona, (marshalledField)...)
+		if i != size - 1{
+			jsona = append(jsona, ',')
+		}
+	}
+	jsona = append(jsona, '}')
+	return string(jsona)
+}
+
+func (move *moveT) GetRoundNo() int {
+	return move.RoundNo
+}
+
+func (move *moveT) ParseMove(jsona string) {
+	//reflect.ValueOf(&move).
+	var internalMove moveInternal
+	if errora := json.Unmarshal([]byte(jsona), &internalMove); errora != nil {
+		//TODO set error flags
+		return
+		fmt.Println(errora)
+	}
+	fmt.Println(internalMove)
+	/*moveReflectedValue := reflect.ValueOf(*move)
+	fmt.Println(reflect.TypeOf(moveAsMap["NewBoard"]))
+	for fieldName, fieldValue := range(moveAsMap){
+		if fieldName == "NewBoard"{
+		fieldReflectedValue := reflect.ValueOf(fieldValue)
+		fmt.Println(fieldName, fieldReflectedValue)
+		//moveReflectedValue.S
+		moveReflectedValue.FieldByName(fieldName).Set(reflect.ValueOf(fieldReflectedValue.Interface().([]interface{})))
+		fmt.Println("ptr")
+		//ptr. Set(fieldReflectedValue)
+		}
+	}*/
+}
+
+func (move *moveT) ValidateMove() (bool, map[string]error) {
+	return true, nil
+}
+
+// Direction is either "left", "right", "up" or "down"
+// RoundNo is also a score
+// Seed represents a 256 bit number encoded as 64 character long hex number.
+// OldBoard represents a board to evaluate
+// TODO validate values
+func (move *moveT) InitMove(oldBoard [BoardSize][BoardSize]int,
+	direction string, roundNo int, seed string) {
+	move.Direction = direction
+	move.Seed.SetString(seed, 16)
+	move.OldBoard = oldBoard
+	move.RoundNo = roundNo
+	move.initMoveCollections()
+}
+
+func (move *moveT) CreateNextMove() Move {
+	nextMove := &moveT{}
+	nextMove.initMoveCollections()
+	nextMove.Seed = move.Seed
+	nextMove.RoundNo = move.RoundNo + 1
+	nextMove.OldBoard = move.NewBoard
+	return nextMove
+}
+
+//TODO
+func (move *moveT) InitFirstMove() {
+	move.initMoveCollections()
+	return
+}
+
+func marshalExcludeFields(structa interface{}, excludeFields map[string]bool,
+) (jsona []byte, status error) {
 	value := reflect.ValueOf(structa)
 	typa := reflect.TypeOf(structa)
 	size := value.NumField()
@@ -113,7 +269,8 @@ func marshalExcludeFields(structa interface{},
 	for i := 0; i < size; i++ {
 		structValue := value.Field(i)
 		var fieldName string = typa.Field(i).Name
-		if marshalledField, marshalStatus := json.Marshal((structValue).Interface()); marshalStatus != nil {
+		if marshalledField, marshalStatus := json.Marshal(
+			(structValue).Interface()); marshalStatus != nil {
 			return []byte{}, marshalStatus
 		} else {
 			if excludeFields[fieldName] == false {
@@ -132,57 +289,6 @@ func marshalExcludeFields(structa interface{},
 	return
 }
 
-func (move *moveT) GetGameOver() bool {
-	return move.IsGameOver
-}
-
-func (move *moveT) SetDirection(string) {
-	return 
-}
-
-func (move *moveT) ExternalView() string {
-	jsona, _ := marshalExcludeFields(*move, map[string]bool{"Seed": true})
-	return string(jsona)
-}
-
-func (move *moveT) InternalView() string {
-	jsona, _ := json.Marshal(*move)
-	return string(jsona)
-}
-
-func (move *moveT) GetRoundNo() int {
-	return move.RoundNo
-}
-
-func (move *moveT) ParseMove(jsona string) error {
-	return json.Unmarshal([]byte(jsona), move)
-}
-
-func (move *moveT) ValidateMove() map[string]error {
-	return nil
-}
-
-// Direction is either "left", "right", "up" or "down"
-// RoundNo is also a score
-// Seed represents a 256 bit number encoded as 64 character long hex number.
-// OldBoard represents a board to evaluate
-// TODO validate values
-func (move *moveT) InitNextMove(oldBoard [BoardSize][BoardSize]int,
-	direction string, roundNo int, seed string) {
-	move.Direction = direction
-	move.Seed.SetString(seed, 16)
-	move.OldBoard = oldBoard
-	move.RoundNo = roundNo
-	move.initMoveCollections()
-}
-
-
-//TODO
-func (move *moveT) InitFirstMove() {
-	move.initMoveCollections()
-	return
-}
-
 func (move *moveT) initMoveCollections() {
 	move.NonMergeMoves = make([]nonMergeMoveT, 0, BoardSize*BoardSize)
 	move.MergeMoves = make([]mergeMoveT, 0, BoardSize*BoardSize)
@@ -197,6 +303,12 @@ func (board *boardT) get(position positionT) int {
 
 func (board *boardT) set(position positionT, value int) {
 	board[position[0]][position[1]] = value
+}
+
+// Get Seed
+func (move *moveT) GetSeed() string {
+	stringa := hex.EncodeToString(move.Seed.Bytes())
+	return stringa
 }
 
 //TODO implement to exlude wrong seeds, wrong directions, etc.
@@ -284,10 +396,12 @@ func (move *moveT) resolveBoardAtIndex(ism *iterationStateMachine) {
 	}
 	dispatchLoser := func() {
 		if ism.isHopefulUnmoved == true {
-			move.NonMovedTiles = append(move.NonMovedTiles, ism.mergeHopefulIndex)
+			move.NonMovedTiles = append(move.NonMovedTiles,
+				ism.mergeHopefulIndex)
 		} else {
 			move.NonMergeMoves = append(move.NonMergeMoves,
-				nonMergeMoveT{ism.mergeHopefulIndex, ism.mergeHopefulDestination})
+				nonMergeMoveT{ism.mergeHopefulIndex,
+					ism.mergeHopefulDestination})
 		}
 	}
 	completeMerge := func() {
@@ -325,13 +439,23 @@ func (move *moveT) resolveBoardAtIndex(ism *iterationStateMachine) {
 	}
 }
 
-func (move *moveT) rollSeed() {
-	hash := crypto.SHA3_256.New()
-	_, _ = hash.Write(move.Seed.Bytes())
-	var throwaway []byte 
-	move.Seed.SetBytes(hash.Sum(throwaway))
-	return
-} 
+func (move *moveT) randInt(upperLimit int, previous bool) int {
+	hash := sha256.New()
+	var roundNumberCast big.Int
+	var upperLimitCast big.Int
+	var bigInt big.Int
+	roundNumberCast.SetInt64(int64(move.RoundNo))
+	if previous {
+		roundNumberCast.Add(&roundNumberCast, bigInt.SetInt64(-1))
+	}
+	upperLimitCast.SetInt64(int64(upperLimit))
+	bigInt.Set(&move.Seed)
+	bigInt.Add(&bigInt, &roundNumberCast)
+	_, _ = hash.Write(bigInt.Bytes())
+	var throwaway []byte
+	bigInt.SetBytes(hash.Sum(throwaway))
+	return int(bigInt.Rem(&bigInt, &upperLimitCast).Int64())
+}
 
 func (move *moveT) firstPass() {
 	var ism iterationStateMachine
@@ -351,14 +475,45 @@ func (move *moveT) firstPass() {
 }
 
 func (move *moveT) secondPass() {
+	var mergePossibleColumns bool
+	var lastValueColumns int
+	var mergePossibleRows bool
+	var lastValueRows int
+	for i := 0; i < BoardSize; i++ {
+		for j := 0; j < BoardSize; j++ {
+			rowPosition := positionT{i, j}
+			columnPosition := positionT{j, i}
+			rowElem := move.NewBoard.get(rowPosition)
+			columnElem := move.NewBoard.get(columnPosition)
+			if rowElem == 0 {
+				move.NewTileCandidates = append(move.NewTileCandidates,
+					rowPosition)
+			} else {
+				if lastValueRows == rowElem {
+					mergePossibleRows = true
+				}
+			}
+			if columnElem != 0 && columnElem == lastValueColumns {
+				mergePossibleColumns = true
+			}
+			lastValueRows = rowElem
+			lastValueColumns = columnElem
+		}
+	}
+	var hasNewTiles bool
+	if len(move.NewTileCandidates) == 0 {
+		hasNewTiles = false
+	} else {
+		hasNewTiles = true
+	}
+	gameOn := mergePossibleRows || mergePossibleColumns || hasNewTiles
+	move.IsGameOver = !gameOn
 
 }
 
 func (move *moveT) ResolveMove() {
 	move.firstPass()
-	move.rollSeed()
 	move.secondPass()
-	move.RoundNo += 1
 	return
 }
 

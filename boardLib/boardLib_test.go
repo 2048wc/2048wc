@@ -61,7 +61,6 @@ func (move *moveTest) check() bool {
 	return result
 }
 
-//TODO test other fields
 func firstPassAllDirectionsNewBoardOnly() []moveTest {
 	finishOffMoveTest := func(test *moveTest) {
 		fullResult := test.task
@@ -201,23 +200,6 @@ func setUpMoveRightSeed() string {
 	return "e9ccc20fdb924ed423ad1b46c6df43516685f4c2bc36e202ad467af1b1d1febf"
 }
 
-// This test is a simple assertion to watch the Move struct, which a lot of
-// infrastructure (database, client) rely on. If the struct changes, or more
-// precisely, if struct jsonification changes, then this test should fail.
-//TODO rewrite Marshalling to produce a unique json representation.
-/*func testJsonMarshalling(t *testing.T) {
-	println("TODO implement")
-	return
-	move := setUpRightMoveHarness()
-	marshalled, err := json.Marshal(move)
-	if err != nil {
-		log.Fatal(err)
-	}
-	expected := `{"Direction":"right","RoundNo":25,"Seed":"e9ccc20fdb924ed423ad1b46c6df43516685f4c2bc36e202ad467af1b1d1febf","OldBoard":[[16,8,4,2],[4,2,2,0],[2,4,0,2],[0,0,0,0]],"NewBoard":[[16,8,4,2],[0,0,4,4],[0,2,4,2],[0,0,0,0]],"NonMergeMoves":[[[1,0],[1,2]],[[2,0],[2,1]],[[2,1],[2,2]]],"MergeMoves":[{"Move":[[1,1],[1,2]],"Value":4}],"NonMovedTiles":[[0,0],[0,1],[0,2],[0,3]],"NewTileCandidates":[[1,0],[2,0],[3,0],[3,1],[3,2],[3,3]],"RandomTiles":[{"Position":[1,1],"Value":2}],"IsGameOver":false}`
-	if string(marshalled) != expected {
-		t.Error(string(marshalled) + "\n" + expected)
-	}
-}*/
 
 func TestMoveTests(t *testing.T) {
 	var moveTests []moveTest = make([]moveTest, 0, 10)
@@ -252,11 +234,130 @@ type magic struct {
 
 func TestMarshalWithoutFields(t *testing.T) {
 	var magic = magic{0, "tusia", [2]int{0, 1}}
-	if json, status := marshalExcludeFields(magic, map[string]bool{"Magic1": true}); status != nil {
+	if json, status := marshalExcludeFields(magic,
+		map[string]bool{"Magic1": true}); status != nil {
 		t.Error(`encoding/json failed`)
 	} else {
 		if string(json) != `{"Magic2":"tusia","Magic3":[0,1]}` {
-			t.Error("is: ", json, "should be: ", `{"Magic2":"tusia","Magic3":[0,1]}`)
+			t.Error("is: ", json,
+				"should be: ", `{"Magic2":"tusia","Magic3":[0,1]}`)
 		}
 	}
+}
+
+// 12259964326927110866866776217202473468949912977468817261 is
+// 7fffffffffffffffffffffffffffffffffffffffffff6d in hex.
+func TestRandom(t *testing.T) {
+	move := CreateMove().(*moveT)
+	move.InitMove([BoardSize][BoardSize]int{
+		{16, 8, 4, 2},
+		{4, 2, 2, 0},
+		{2, 4, 0, 2},
+		{2, 0, 0, 0},
+	}, "left", 21, "7fffffffffffffffffffffffffffffffffffffffffff6d")
+	seedPlusOne := CreateMove().(*moveT)
+	seedPlusOne.InitMove([BoardSize][BoardSize]int{
+		{16, 8, 4, 2},
+		{4, 2, 2, 0},
+		{2, 4, 0, 2},
+		{2, 0, 0, 0},
+	}, "left", 20, "7fffffffffffffffffffffffffffffffffffffffffff6e")
+	moveString := move.Seed.String()
+	if moveString != "12259964326927110866866776217202473468949912977468817261" {
+		t.Error("wrong hex->int bigInt conversion.", move.Seed.String())
+	}
+	if move.randInt(100, false) != seedPlusOne.randInt(100, false) {
+		t.Error("roundNo doesn't have equal input with the seed")
+	}
+	if move.randInt(65536, false) != move.randInt(65536, false) {
+		t.Error("should be indempotent")
+	}
+	seedPlusOne.RoundNo = 21
+	if move.randInt(19911993, false) != seedPlusOne.randInt(19911993, true) {
+		t.Error("can't do previous.")
+	}
+}
+
+func TestSecondPass(t *testing.T) {
+	noGameOverColumns := moveT{
+		NewBoard: [BoardSize][BoardSize]int{
+			{1, 2, 3, 4},
+			{5, 6, 7, 8},
+			{9, 10, 11, 12},
+			{13, 14, 15, 12},
+		},
+	}
+	noGameOverColumns.secondPass()
+	if noGameOverColumns.IsGameOver != false {
+		t.Error("why game over")
+	}
+	if len(noGameOverColumns.NewTileCandidates) != 0 {
+		t.Error("should be empty")
+	}
+
+	noGameOverRows := moveT{
+		NewBoard: [BoardSize][BoardSize]int{
+			{1, 2, 3, 4},
+			{5, 6, 7, 8},
+			{9, 10, 11, 12},
+			{13, 14, 15, 15},
+		},
+	}
+
+	noGameOverRows.secondPass()
+	if noGameOverRows.IsGameOver != false {
+		t.Error("why game over")
+	}
+	if len(noGameOverRows.NewTileCandidates) != 0 {
+		t.Error("should be empty")
+	}
+
+	noGameOverEmpties := moveT{
+		NewBoard: [BoardSize][BoardSize]int{
+			{1, 2, 3, 4},
+			{0, 6, 0, 8},  // positionT{1, 0}, positionT{1, 2}
+			{9, 0, 11, 0}, // positionT{2, 1}, positionT{2, 3}
+			{13, 14, 15, 15},
+		},
+	}
+
+	noGameOverEmpties.secondPass()
+	if noGameOverEmpties.IsGameOver != false {
+		t.Error("why game over")
+	}
+	if reflect.DeepEqual(noGameOverEmpties.NewTileCandidates,
+		[]positionT{{1, 0}, {1, 2}, {2, 1}, {2, 3}},
+	) == false {
+		t.Error("should be empty")
+	}
+}
+
+func TestInternalView(t *testing.T){
+	moveI := CreateMove()	
+	moveI.InitMove([BoardSize][BoardSize]int{}, "", 0, "7fffffffffffffffffffffffffffffffffffffffffff6e")
+	expected := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
+	actual := moveI.InternalView()
+	if actual != expected {
+		t.Error("\nactual: --\n expected: --\n", actual, "\n", expected)
+	}
+}
+
+func TestHashing(t *testing.T){
+	movea := CreateMove().(*moveT)
+	// hashing a string "a", also known as a byte 0x61 or simply 0110 0001
+	// SHA256 of this string is ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb
+	// In decimal it is 91634880152443617534842621287039938041581081254914058002978601050179556493499
+	// the remainder from division of this number by 1 million is 493499
+	// could be a lucky coincidence ;)
+	movea.InitMove([BoardSize][BoardSize]int{}, "", 0, "61")
+	if movea.randInt(1000*1000, false) != 493499{
+		t.Error(movea.randInt(1000*1000, false), "!=", 493499)
+	}
+}
+
+func TestUnmarshal(t *testing.T){
+	movea := CreateMove().(*moveT)
+	jsona := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
+	movea.ParseMove(jsona)
+	
 }
