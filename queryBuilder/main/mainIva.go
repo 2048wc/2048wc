@@ -18,7 +18,7 @@ package main
 
 import "../../queryBuilder"
 
-//import "fmt"
+import "fmt"
 //import "../../boardLib"
 //import "encoding/json"
 
@@ -27,6 +27,6 @@ func main() {
 	//funkcja := queryBuilder.InitGame
 	//	result := queryBuilder.RetryDatabase(&funkcja, 1000, 4)
 	//	fmt.Println(result)
-	 queryBuilder.InitGame("ivaivaiva", "adamadamadam")
-
+	// queryBuilder.InitGame("ivaivaiva", "adamadamadam")
+	//fmt.Println(queryBuilder.IsGameIdValid ("aaaaaaaaaaaaaaaaaaaaaaaaaa"))
 }

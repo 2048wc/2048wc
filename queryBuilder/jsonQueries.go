@@ -45,7 +45,7 @@ type UsersGamesQueryBuilder interface {
 	// prepares a query, which checks if there is a game already open for the
 	// user. If there is it kupas. If there is not, it
 	// creates a move. Then it updates the user list with the current game.
-	InitGame(userID string, initialMove string) []string
+	InitGame(userID string, initialMove string) string
 
 	// prepares a query, which, if there is a current game, it returns the most
 	// recent move. Otherwise, kupa.
@@ -74,24 +74,48 @@ func delayMiliseconds(n time.Duration) {
 	time.Sleep(n * time.Millisecond)
 }
 
+func IsGameIdValid(gameID string) bool {
+	// gameID is 32 chars
+	// gameID doesn't contain bad chars
+	valid := map[byte]bool{'0': true, '1': true, '2': true, '3': true,
+		'4': true, '5': true, '6': true, '7': true, '8': true, '9': true,
+		'a': true, 'b': true, 'c': true, 'd': true, 'e': true, 'f': true}
+	const length = 32
+	if len(gameID) != length {
+		return false
+	}
+	for i := 0; i < length; i++ {
+		if valid[gameID[i]] == false {
+			return false
+		}
+	}
+	return true
+}
+
 type QueryBuilder struct{}
+
+func (qb QueryBuilder) GetBestGameWindow(userID string, n int, m int) []string {
+	return []string{""}
+}
 
 // prepares a query, which checks if there is a game already open for the
 // user. If there is it kupas. If there is not, it
 // creates a move. Then it updates the user list with the current game.
-func InitGame(userID string, initialMove string) string {
+func (qb QueryBuilder) InitGame(userID string, initialMove string) string {
+
+	// userID validation
 
 	var query string
-	query = "lastGameID = redis.call(\"LRANGE\","+ userID + ", -1, -1)\n" +
-	"lastItemInGame = redis.call(\"LRANGE\", lastGameID, -1, -1)\n" +
-	"if lastItemInGame == \"finished\" then\n" +
-	// init the game using initial move
-	// TODO compose a gameid
-    "else\n" + 
-    "return \"kupa\"\n"
-	
+	query = "lastGameID = redis.call(\"LRANGE\", keys[0], -1, -1)\n" +
+		"lastItemInGame = redis.call(\"LRANGE\", lastGameID, -1, -1)\n" +
+		"if lastItemInGame == \"finished\" then\n" +
+		// init the game using initial move
+		// TODO compose a gameid
+		"else\n" +
+		"return \"kupa\"\n"
+	//userID = `123, -1, -1); redis.call("DELETE", "ALL") #`
 	fmt.Println(query, "\n")
-	
+
 	// fmt.Println(fmt.Sprintf("<%s>", userID))
 	// lastGameID, err := client.Cmd("EVAL", fmt.Sprintf(`return redis.call("LRANGE",KEYS[1],"%s")`, "ivaLikes"), 1, "adam")
 
@@ -136,7 +160,7 @@ func (qb QueryBuilder) AddMoveToDB(jmove string, listName string) error {
 	return errors.New("200 OK")
 }
 
-func RetryDatabase(call *func() (bool, error), totalDelay time.Duration, numberOfTries int) error {
+func (qb QueryBuilder) RetryDatabase(call *func() (bool, error), totalDelay time.Duration, numberOfTries int) error {
 
 	if totalDelay <= 0 {
 		err := errors.New("total delay is equal or less than 0")
@@ -162,7 +186,6 @@ func RetryDatabase(call *func() (bool, error), totalDelay time.Duration, numberO
 	}
 	return err
 }
-
 
 /*
 This function establishes a connection to the database.
