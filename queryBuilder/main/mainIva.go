@@ -14,23 +14,19 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 package main
 
 import "../../queryBuilder"
-import "fmt"
+
+//import "fmt"
+//import "../../boardLib"
+//import "encoding/json"
 
 func main() {
-	
-	returned := queryBuilder.Init()
-	if returned == 0 {
-		length := queryBuilder.ListLen()
-		fmt.Println(length)
-		number, roundNo, direction := queryBuilder.ReadJson()
-		fmt.Println("1: ", number)
-		fmt.Println("2: ", roundNo)
-		fmt.Println("3: ", direction)
-	} else {
-		fmt.Println("couldn't connect to the database")
-	}
+
+	//funkcja := queryBuilder.InitGame
+	//	result := queryBuilder.RetryDatabase(&funkcja, 1000, 4)
+	//	fmt.Println(result)
+	 queryBuilder.InitGame("ivaivaiva", "adamadamadam")
+
 }
