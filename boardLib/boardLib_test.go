@@ -355,9 +355,14 @@ func TestHashing(t *testing.T){
 	}
 }
 
-func TestUnmarshal(t *testing.T){
+func TestUnmarshalSeed(t *testing.T){
 	movea := CreateMove().(*moveT)
-	jsona := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
+	jsona := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
 	movea.ParseMove(jsona)
-	
+	if (movea.InternalView() != jsona){
+		fmt.Println("")
+		fmt.Println(movea.InternalView())
+		fmt.Println(jsona)
+		t.Error("mismatch")
+	}
 }

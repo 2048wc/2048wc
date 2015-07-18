@@ -129,7 +129,7 @@ type moveT struct {
 	RandomTiles       []positionValueT
 }
 
-type moveInternal struct {
+type internalMoveT struct {
 	//You are responsible for initialising those
 	Direction string
 	RoundNo   int
@@ -205,26 +205,37 @@ func (move *moveT) GetRoundNo() int {
 }
 
 func (move *moveT) ParseMove(jsona string) {
-	//reflect.ValueOf(&move).
-	var internalMove moveInternal
-	if errora := json.Unmarshal([]byte(jsona), &internalMove); errora != nil {
+	var internalMoveStruct internalMoveT
+	if errora := json.Unmarshal([]byte(jsona), &internalMoveStruct); errora != nil {
 		//TODO set error flags
-		return
 		fmt.Println(errora)
+		panic(errora)
+		return
 	}
-	fmt.Println(internalMove)
-	/*moveReflectedValue := reflect.ValueOf(*move)
-	fmt.Println(reflect.TypeOf(moveAsMap["NewBoard"]))
-	for fieldName, fieldValue := range(moveAsMap){
-		if fieldName == "NewBoard"{
-		fieldReflectedValue := reflect.ValueOf(fieldValue)
-		fmt.Println(fieldName, fieldReflectedValue)
-		//moveReflectedValue.S
-		moveReflectedValue.FieldByName(fieldName).Set(reflect.ValueOf(fieldReflectedValue.Interface().([]interface{})))
-		fmt.Println("ptr")
-		//ptr. Set(fieldReflectedValue)
+	// repr stands for representation, as in-memory representation. That's to
+	// differentiate it from internal representation.
+	
+	internalMove := reflect.ValueOf(internalMoveStruct)
+	internalMoveType := reflect.TypeOf(internalMoveStruct)
+	reprMove := reflect.ValueOf(move)
+	//reprMoveType := reflect.TypeOf(*move)
+	size := internalMove.NumField()
+	if size != reprMove.Elem().NumField() {
+		// TODO set error flags
+		panic("misaligned structs")
+	}
+	for i := 0; i < size; i++ {
+		internalField := internalMove.Field(i)
+		internalFieldName := internalMoveType.Field(i).Name
+		reprField := reprMove.Elem().FieldByName(internalFieldName)
+		if internalFieldName == "Seed" {
+			var bigInt big.Int
+			bigInt.SetString(internalField.Interface().(string), 16)
+			move.Seed = bigInt
+		} else {
+			reprField.Set(internalField)
 		}
-	}*/
+	}
 }
 
 func (move *moveT) ValidateMove() (bool, map[string]error) {
