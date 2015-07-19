@@ -16,50 +16,236 @@
 
 package boardLib
 
-// import "encoding/json"
+import "encoding/json"
+import "encoding/hex"
+import "reflect"
+import "math/big"
 import "fmt"
+
+//import "errors"
+
+import "crypto/sha256"
 
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.
 const BoardSize = 4
+const NewTileValue = 2
 
 var allowedMoves map[string]bool = map[string]bool{"left": true, "right": true,
 	"up": true, "down": true}
 
-type BoardT [BoardSize][BoardSize]int
+type boardT [BoardSize][BoardSize]int
 type positionT [2]int
 type positionValueT struct {
 	Position positionT
 	Value    int
 }
-type moveT [2]positionT
+
+type nonMergeMoveT [2]positionT
 type mergeMoveT struct {
-	From  moveT
+	From  nonMergeMoveT
 	To    positionT
 	Value int
 }
 
-// This is the struct, which is going to be both
+// Creates an empty Move. The move has to be then initialised using
+func CreateMove() Move {
+	return &moveT{}
+}
+
+type Move interface {
+	// This initialises all the fields with sensible defaults for the first
+	// move. This includes 2 random tiles, a random seed, a non-zero round
+	// number, a valid direction and non-nil pointers for all internal data
+	// structures. After initialisation it is safe to call other functions on
+	// this struct.
+	InitFirstMove()
+
+	// Like InitFirstMove, but with more control over the initial conditions of
+	// the move
+	InitMove(oldBoard [BoardSize][BoardSize]int,
+		direction string, roundNo int, seed string)
+
+	// Init the board using a json passed in as a string. Call ValidateMove
+	// after this function.
+	ParseMove(json string)
+
+	// Sets direction of this move. Allowed directions are left, right,
+	// down, up. Call ValidateMove afterwards to make sure that the struct is
+	// still in acceptable state.
+	SetDirection(string)
+
+	// Returns a new move newMove.OldBoard := oldMove.NewBoard, roundNo += 1,
+	// and the seed carried over.
+	CreateNextMove() Move
+
+	// Evolves board one step forward. Can put errors in ValidateMove.
+	// Call ValidateMove before and afterwards.
+	ResolveMove()
+
+	// Checks if move fields satisfy some basic constraints. Should be
+	// called before ResolveMove. Returns a map of field names onto errors for
+	// incorrectly valued fields. Both Resolved and Unresolved moves satisfy
+	// validation. Resolved moves return isResolved true.
+	ValidateMove() (isResolved bool, errors map[string]error)
+
+	// Internal json representation of the struct. Do not show to the client!
+	// Exports confidential fields.
+	InternalView() (json string)
+
+	// External json representation. Safe to share with the client.
+	ExternalView() (json string)
+
+	// Get Round Number, which is simultanously a score.
+	GetRoundNo() int
+
+	// Get Seed
+	GetSeed() string
+
+	// Get the status of the game.
+	GetGameOver() bool
+}
+
+// The json view of this struct is going to be both
 // used on the frontend to do board animation,
 // and on the backend for future replays.
 // both fronted and backend json views of this struct
 // are going to look the same, apart from
 // dropping the Seed field from the client view
 // for security reasons.
-type Move struct {
+
+type moveT struct {
+	//You are responsible for initialising those
+	Direction string
+	RoundNo   int
+	Seed      big.Int
+	OldBoard  boardT
+	// Resolved by firstPass
+	NewBoard      boardT
+	NonMergeMoves []nonMergeMoveT
+	MergeMoves    []mergeMoveT
+	NonMovedTiles []positionT
+	// Resolved by secondPass
+	NewTileCandidates []positionT
+	IsGameOver        bool
+	RandomTiles       []positionValueT
+}
+
+type internalMoveT struct {
 	//You are responsible for initialising those
 	Direction string
 	RoundNo   int
 	Seed      string
-	OldBoard  BoardT
-	//These are going to be computed by the move pipeline
-	NewBoard          BoardT
-	NonMergeMoves     []moveT
-	MergeMoves        []mergeMoveT
-	NonMovedTiles     []positionT
+	OldBoard  boardT
+	// Resolved by firstPass
+	NewBoard      boardT
+	NonMergeMoves []nonMergeMoveT
+	MergeMoves    []mergeMoveT
+	NonMovedTiles []positionT
+	// Resolved by secondPass
 	NewTileCandidates []positionT
-	RandomTiles       []positionValueT
 	IsGameOver        bool
+	RandomTiles       []positionValueT
+}
+
+func (move *moveT) GetGameOver() bool {
+	return move.IsGameOver
+}
+
+func (move *moveT) SetDirection(direction string) {
+	if allowedMoves[direction] == true {
+		move.Direction = direction
+	} else {
+		//TODO error
+	}
+}
+
+func (move *moveT) ExternalView() string {
+	jsona, err := marshalExcludeFields(*move, map[string]bool{"Seed": true})
+	//TODO put err into a map with errors
+	if err != nil {
+		return ""
+	}
+	return string(jsona)
+}
+
+func (move *moveT) InternalView() string {
+	var jsona []byte
+	value := reflect.ValueOf(*move)
+	typa := reflect.TypeOf(*move)
+	size := value.NumField()
+	jsona = append(jsona, '{')
+	for i := 0; i < size; i++ {
+		structValue := value.Field(i)
+		fieldName := typa.Field(i).Name
+		var marshalStatus error
+		var marshalledField []byte
+		if fieldName == "Seed" {
+			marshalledField, marshalStatus = json.Marshal(
+				move.GetSeed())
+			if marshalStatus != nil {
+				return ""
+			}
+		} else {
+			marshalledField, marshalStatus = json.Marshal(
+				(structValue).Interface())
+			if marshalStatus != nil {
+				return ""
+			}
+		}
+		jsona = append(jsona, '"')
+		jsona = append(jsona, []byte(fieldName)...)
+		jsona = append(jsona, '"')
+		jsona = append(jsona, ':')
+		jsona = append(jsona, (marshalledField)...)
+		if i != size-1 {
+			jsona = append(jsona, ',')
+		}
+	}
+	jsona = append(jsona, '}')
+	return string(jsona)
+}
+
+func (move *moveT) GetRoundNo() int {
+	return move.RoundNo
+}
+
+func (move *moveT) ParseMove(jsona string) {
+	var internalMoveStruct internalMoveT
+	if errora := json.Unmarshal([]byte(jsona), &internalMoveStruct); errora != nil {
+		//TODO set error flags
+		fmt.Println(errora)
+		panic(errora)
+		return
+	}
+	// repr stands for representation, as in-memory representation. That's to
+	// differentiate it from internal representation.
+
+	internalMove := reflect.ValueOf(internalMoveStruct)
+	internalMoveType := reflect.TypeOf(internalMoveStruct)
+	reprMove := reflect.ValueOf(move)
+	//reprMoveType := reflect.TypeOf(*move)
+	size := internalMove.NumField()
+	if size != reprMove.Elem().NumField() {
+		// TODO set error flags
+		panic("misaligned structs")
+	}
+	for i := 0; i < size; i++ {
+		internalField := internalMove.Field(i)
+		internalFieldName := internalMoveType.Field(i).Name
+		reprField := reprMove.Elem().FieldByName(internalFieldName)
+		if internalFieldName == "Seed" {
+			var bigInt big.Int
+			bigInt.SetString(internalField.Interface().(string), 16)
+			move.Seed = bigInt
+		} else {
+			reprField.Set(internalField)
+		}
+	}
+}
+
+func (move *moveT) ValidateMove() (bool, map[string]error) {
+	return true, nil
 }
 
 // Direction is either "left", "right", "up" or "down"
@@ -67,63 +253,96 @@ type Move struct {
 // Seed represents a 256 bit number encoded as 64 character long hex number.
 // OldBoard represents a board to evaluate
 // TODO validate values
-func CreateMove(oldBoard BoardT,
-	direction string,
-	roundNo int,
-	seed string) (move Move) {
+func (move *moveT) InitMove(oldBoard [BoardSize][BoardSize]int,
+	direction string, roundNo int, seed string) {
 	move.Direction = direction
-	move.Seed = seed
+	move.Seed.SetString(seed, 16)
 	move.OldBoard = oldBoard
 	move.RoundNo = roundNo
-	move.NonMergeMoves = make([]moveT, 0, BoardSize*BoardSize)
+	move.initMoveCollections()
+}
+
+func (move *moveT) CreateNextMove() Move {
+	nextMove := &moveT{}
+	nextMove.initMoveCollections()
+	nextMove.Seed = move.Seed
+	nextMove.RoundNo = move.RoundNo + 1
+	nextMove.OldBoard = move.NewBoard
+	return nextMove
+}
+
+//TODO
+func (move *moveT) InitFirstMove() {
+	move.initMoveCollections()
+	move.secondPass()
+	//TODO seed it with a function from utils.
+	(&(move.Seed)).SetString("7fffffffffffffffffffffffffffffffffffffffffff6e", 16)
+	move.generateRandomTiles(true, &(move.OldBoard))
+	return
+}
+
+func marshalExcludeFields(structa interface{}, excludeFields map[string]bool,
+) (jsona []byte, status error) {
+	value := reflect.ValueOf(structa)
+	typa := reflect.TypeOf(structa)
+	size := value.NumField()
+	jsona = append(jsona, '{')
+	for i := 0; i < size; i++ {
+		structValue := value.Field(i)
+		var fieldName string = typa.Field(i).Name
+		if marshalledField, marshalStatus := json.Marshal(
+			(structValue).Interface()); marshalStatus != nil {
+			return []byte{}, marshalStatus
+		} else {
+			if excludeFields[fieldName] == false {
+				jsona = append(jsona, '"')
+				jsona = append(jsona, []byte(fieldName)...)
+				jsona = append(jsona, '"')
+				jsona = append(jsona, ':')
+				jsona = append(jsona, (marshalledField)...)
+				if i != size-len(excludeFields) {
+					jsona = append(jsona, ',')
+				}
+			}
+		}
+	}
+	jsona = append(jsona, '}')
+	return
+}
+
+func (move *moveT) initMoveCollections() {
+	move.NonMergeMoves = make([]nonMergeMoveT, 0, BoardSize*BoardSize)
 	move.MergeMoves = make([]mergeMoveT, 0, BoardSize*BoardSize)
 	move.NonMovedTiles = make([]positionT, 0, BoardSize*BoardSize)
 	move.NewTileCandidates = make([]positionT, 0, BoardSize*BoardSize)
 	move.RandomTiles = make([]positionValueT, 0, BoardSize*BoardSize)
-	return
 }
 
-func (board *BoardT) get(position positionT) int {
+func (board *boardT) get(position positionT) int {
 	return board[position[0]][position[1]]
 }
 
-func (board *BoardT) set(position positionT, value int) {
+func (board *boardT) set(position positionT, value int) {
 	board[position[0]][position[1]] = value
-	return
 }
 
-func (board *BoardT) add(position positionT, value int) int {
-	board[position[0]][position[1]] += value
-	return board[position[0]][position[1]]
+// Get Seed
+func (move *moveT) GetSeed() string {
+	stringa := hex.EncodeToString(move.Seed.Bytes())
+	return stringa
 }
 
 //TODO implement to exlude wrong seeds, wrong directions, etc.
-func (move *Move) validateBoardInitialisation() {
+func (move *moveT) validateBoardInitialisation() {
 	return
 }
 
 //TODO checks if game is over
-func (move *Move) isGameOver() bool {
+func (move *moveT) isGameOver() bool {
 	return false
 }
 
-func invertDirection(direction string) string {
-	if direction == "up" {
-		return "down"
-	}
-	if direction == "down" {
-		return "up"
-	}
-	if direction == "left" {
-		return "right"
-	}
-	if direction == "right" {
-		return "left"
-	}
-	return ""
-}
-
-type IterationStateMachine struct {
+type iterationStateMachine struct {
 	// These are assigned by setDirections
 	smallStepForward  [2]int
 	smallStepBackward [2]int
@@ -139,7 +358,7 @@ type IterationStateMachine struct {
 	currentIndex positionT
 }
 
-func (ism *IterationStateMachine) setDirections(direction string) {
+func (ism *iterationStateMachine) setDirections(direction string) {
 	if direction == "right" {
 		ism.currentIndex = positionT{0, BoardSize - 1}
 		ism.smallStepForward = [2]int{0, 1}
@@ -161,7 +380,6 @@ func (ism *IterationStateMachine) setDirections(direction string) {
 		ism.smallStepBackward = [2]int{-1, 0}
 		ism.bigStep = [2]int{BoardSize - 1, 1}
 	}
-	return
 }
 
 func (position *positionT) nextPosition(stepSize [2]int, numberOfSteps int) {
@@ -169,18 +387,16 @@ func (position *positionT) nextPosition(stepSize [2]int, numberOfSteps int) {
 	position[1] = position[1] + stepSize[1]*numberOfSteps
 }
 
-func (newboard *BoardT) incrementFromBySteps(oldboard *BoardT,
+func (newboard *boardT) incrementFromBySteps(oldboard *boardT,
 	incrementFrom positionT, step [2]int, numberOfSteps int) (int, positionT) {
-	value := oldboard[incrementFrom[0]][incrementFrom[1]]
+	value := oldboard.get(incrementFrom)
 	row := incrementFrom[0] + step[0]*numberOfSteps
 	column := incrementFrom[1] + step[1]*numberOfSteps
 	newboard[row][column] += value
-	var tusia = 0
-	tusia = tusia
 	return newboard[row][column], positionT{row, column}
 }
 
-func (move *Move) resolveBoardAtIndex(ism *IterationStateMachine) {
+func (move *moveT) resolveBoardAtIndex(ism *iterationStateMachine) {
 	giveHope := func() {
 		_, position := move.NewBoard.incrementFromBySteps(&move.OldBoard,
 			ism.currentIndex, ism.smallStepForward, ism.distance)
@@ -201,17 +417,19 @@ func (move *Move) resolveBoardAtIndex(ism *IterationStateMachine) {
 	}
 	dispatchLoser := func() {
 		if ism.isHopefulUnmoved == true {
-			move.NonMovedTiles = append(move.NonMovedTiles, ism.mergeHopefulIndex)
+			move.NonMovedTiles = append(move.NonMovedTiles,
+				ism.mergeHopefulIndex)
 		} else {
 			move.NonMergeMoves = append(move.NonMergeMoves,
-				moveT{ism.mergeHopefulIndex, ism.mergeHopefulDestination})
+				nonMergeMoveT{ism.mergeHopefulIndex,
+					ism.mergeHopefulDestination})
 		}
 	}
 	completeMerge := func() {
 		ism.distance += 1
 		value, position := move.NewBoard.incrementFromBySteps(&move.OldBoard,
 			ism.currentIndex, ism.smallStepForward, ism.distance)
-		fromMoves := moveT{ism.mergeHopefulIndex, ism.currentIndex}
+		fromMoves := nonMergeMoveT{ism.mergeHopefulIndex, ism.currentIndex}
 		mergeMove := mergeMoveT{From: fromMoves,
 			To:    position,
 			Value: value}
@@ -242,9 +460,28 @@ func (move *Move) resolveBoardAtIndex(ism *IterationStateMachine) {
 	}
 }
 
-//TODO implement to satisfy the TDD test case
-func (move *Move) ExecuteMove() error {
-	var ism IterationStateMachine
+func (move *moveT) randInt(upperLimit int, previous bool) int {
+	hash := sha256.New()
+	var roundNumberCast big.Int
+	var upperLimitCast big.Int
+	var bigInt big.Int
+	var minusOne big.Int
+	(&minusOne).SetInt64(-1)
+	roundNumberCast.SetInt64(int64(move.RoundNo))
+	if previous {
+		roundNumberCast.Add(&roundNumberCast, &minusOne)
+	}
+	upperLimitCast.SetInt64(int64(upperLimit))
+	bigInt.Set(&move.Seed)
+	bigInt.Add(&bigInt, &roundNumberCast)
+	_, _ = hash.Write(bigInt.Bytes())
+	var throwaway []byte
+	bigInt.SetBytes(hash.Sum(throwaway))
+	return int(bigInt.Rem(&bigInt, &upperLimitCast).Int64())
+}
+
+func (move *moveT) firstPass() {
+	var ism iterationStateMachine
 	ism.setDirections(move.Direction)
 	for i := 0; i < BoardSize; i++ {
 		ism.distance = 0
@@ -256,28 +493,67 @@ func (move *Move) ExecuteMove() error {
 			}
 			move.resolveBoardAtIndex(&ism)
 		}
-		/*if i != BoardSize {*/
-			ism.currentIndex.nextPosition(ism.bigStep, 1)
-		/*}*/
+		ism.currentIndex.nextPosition(ism.bigStep, 1)
 	}
-	move.RoundNo += 1
-	return nil
 }
 
-// TODO implement, and cover with a test case,
-// perhaps smarter than the current marshalling test case
-func (move *Move) Marshal() (jsonified string) {
-	return ""
-}
-
-// This might be useful for logging/ command line interface.
-// For the database we'll have to use a different function that's
-// going to return json.
-func PrintBoard(board BoardT) {
-	for _, row := range board {
-		for _, value := range row {
-			fmt.Print(value, " ")
+func (move *moveT) secondPass() {
+	var mergePossibleColumns bool
+	var lastValueColumns int
+	var mergePossibleRows bool
+	var lastValueRows int
+	for i := 0; i < BoardSize; i++ {
+		for j := 0; j < BoardSize; j++ {
+			rowPosition := positionT{i, j}
+			columnPosition := positionT{j, i}
+			rowElem := move.NewBoard.get(rowPosition)
+			columnElem := move.NewBoard.get(columnPosition)
+			if rowElem == 0 {
+				move.NewTileCandidates = append(move.NewTileCandidates,
+					rowPosition)
+			} else {
+				if lastValueRows == rowElem {
+					mergePossibleRows = true
+				}
+			}
+			if columnElem != 0 && columnElem == lastValueColumns {
+				mergePossibleColumns = true
+			}
+			lastValueRows = rowElem
+			lastValueColumns = columnElem
 		}
-		fmt.Println("")
 	}
+	var hasNewTiles bool
+	if len(move.NewTileCandidates) == 0 {
+		hasNewTiles = false
+	} else {
+		hasNewTiles = true
+	}
+	gameOn := mergePossibleRows || mergePossibleColumns || hasNewTiles
+	move.IsGameOver = !gameOn
+
+}
+
+func (move *moveT) generateRandomTiles (wantTwo bool, board *boardT){
+	choiceRange := len(move.NewTileCandidates)
+	randInt := move.randInt(choiceRange, wantTwo)
+	position := move.NewTileCandidates[randInt]
+	board.set(position, NewTileValue)
+	move.RandomTiles = append(move.RandomTiles,
+	positionValueT{position, NewTileValue})
+	if wantTwo {
+		move.generateRandomTiles(false, board)
+	}
+}
+
+func (move *moveT) ResolveMove() {
+	move.firstPass()
+	move.secondPass()
+	if len(move.NonMergeMoves) == 0 && len(move.MergeMoves) == 0 {
+		//TODO report error
+		move.RoundNo -= 1
+		return
+	} 
+	move.generateRandomTiles(false, &(move.NewBoard))
+	return
 }
