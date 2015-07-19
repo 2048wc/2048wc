@@ -21,6 +21,7 @@ import "encoding/hex"
 import "reflect"
 import "math/big"
 import "fmt"
+
 //import "errors"
 
 import "crypto/sha256"
@@ -28,6 +29,7 @@ import "crypto/sha256"
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.
 const BoardSize = 4
+const NewTileValue = 2
 
 var allowedMoves map[string]bool = map[string]bool{"left": true, "right": true,
 	"up": true, "down": true}
@@ -60,6 +62,7 @@ type Move interface {
 	InitFirstMove()
 
 	// Like InitFirstMove, but with more control over the initial conditions of
+	// the move
 	InitMove(oldBoard [BoardSize][BoardSize]int,
 		direction string, roundNo int, seed string)
 
@@ -83,8 +86,7 @@ type Move interface {
 	// Checks if move fields satisfy some basic constraints. Should be
 	// called before ResolveMove. Returns a map of field names onto errors for
 	// incorrectly valued fields. Both Resolved and Unresolved moves satisfy
-	// validation. Resolved moves return isResolved true. Move which doesn't
-	// progress the board is detected as an error in NewBoard.
+	// validation. Resolved moves return isResolved true.
 	ValidateMove() (isResolved bool, errors map[string]error)
 
 	// Internal json representation of the struct. Do not show to the client!
@@ -150,14 +152,18 @@ func (move *moveT) GetGameOver() bool {
 	return move.IsGameOver
 }
 
-func (move *moveT) SetDirection(string) {
-	return
+func (move *moveT) SetDirection(direction string) {
+	if allowedMoves[direction] == true {
+		move.Direction = direction
+	} else {
+		//TODO error
+	}
 }
 
 func (move *moveT) ExternalView() string {
 	jsona, err := marshalExcludeFields(*move, map[string]bool{"Seed": true})
 	//TODO put err into a map with errors
-	if err != nil{
+	if err != nil {
 		return ""
 	}
 	return string(jsona)
@@ -174,17 +180,17 @@ func (move *moveT) InternalView() string {
 		fieldName := typa.Field(i).Name
 		var marshalStatus error
 		var marshalledField []byte
-		if fieldName == "Seed"{
+		if fieldName == "Seed" {
 			marshalledField, marshalStatus = json.Marshal(
-				move.GetSeed());
+				move.GetSeed())
 			if marshalStatus != nil {
 				return ""
 			}
-		} else{
+		} else {
 			marshalledField, marshalStatus = json.Marshal(
-			(structValue).Interface())
+				(structValue).Interface())
 			if marshalStatus != nil {
-			return ""
+				return ""
 			}
 		}
 		jsona = append(jsona, '"')
@@ -192,7 +198,7 @@ func (move *moveT) InternalView() string {
 		jsona = append(jsona, '"')
 		jsona = append(jsona, ':')
 		jsona = append(jsona, (marshalledField)...)
-		if i != size - 1{
+		if i != size-1 {
 			jsona = append(jsona, ',')
 		}
 	}
@@ -214,7 +220,7 @@ func (move *moveT) ParseMove(jsona string) {
 	}
 	// repr stands for representation, as in-memory representation. That's to
 	// differentiate it from internal representation.
-	
+
 	internalMove := reflect.ValueOf(internalMoveStruct)
 	internalMoveType := reflect.TypeOf(internalMoveStruct)
 	reprMove := reflect.ValueOf(move)
@@ -268,6 +274,10 @@ func (move *moveT) CreateNextMove() Move {
 //TODO
 func (move *moveT) InitFirstMove() {
 	move.initMoveCollections()
+	move.secondPass()
+	//TODO seed it with a function from utils.
+	(&(move.Seed)).SetString("7fffffffffffffffffffffffffffffffffffffffffff6e", 16)
+	move.generateRandomTiles(true, &(move.OldBoard))
 	return
 }
 
@@ -455,9 +465,11 @@ func (move *moveT) randInt(upperLimit int, previous bool) int {
 	var roundNumberCast big.Int
 	var upperLimitCast big.Int
 	var bigInt big.Int
+	var minusOne big.Int
+	(&minusOne).SetInt64(-1)
 	roundNumberCast.SetInt64(int64(move.RoundNo))
 	if previous {
-		roundNumberCast.Add(&roundNumberCast, bigInt.SetInt64(-1))
+		roundNumberCast.Add(&roundNumberCast, &minusOne)
 	}
 	upperLimitCast.SetInt64(int64(upperLimit))
 	bigInt.Set(&move.Seed)
@@ -522,20 +534,26 @@ func (move *moveT) secondPass() {
 
 }
 
+func (move *moveT) generateRandomTiles (wantTwo bool, board *boardT){
+	choiceRange := len(move.NewTileCandidates)
+	randInt := move.randInt(choiceRange, wantTwo)
+	position := move.NewTileCandidates[randInt]
+	board.set(position, NewTileValue)
+	move.RandomTiles = append(move.RandomTiles,
+	positionValueT{position, NewTileValue})
+	if wantTwo {
+		move.generateRandomTiles(false, board)
+	}
+}
+
 func (move *moveT) ResolveMove() {
 	move.firstPass()
 	move.secondPass()
+	if len(move.NonMergeMoves) == 0 && len(move.MergeMoves) == 0 {
+		//TODO report error
+		move.RoundNo -= 1
+		return
+	} 
+	move.generateRandomTiles(false, &(move.NewBoard))
 	return
 }
-
-// This might be useful for logging/ command line interface.
-// For the database we'll have to use a different function that's
-// going to return json.
-/*func PrintBoard(board boardT) {
-	for _, row := range board {
-		for _, value := range row {
-			fmt.Print(value, " ")
-		}
-		fmt.Println("")
-	}
-}*/
