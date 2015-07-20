@@ -32,7 +32,7 @@ import "errors"
 // import "container/list"
 import "reflect"
 
-/*
+/* uncomment and use this once the api is fully implemented
 type UserGameQuery struct {
 	query []string
 	replyParser *func(query *UserGameQuery) interface{}
@@ -45,11 +45,11 @@ type UsersGamesQueryBuilder interface {
 	// prepares a query, which checks if there is a game already open for the
 	// user. If there is it kupas. If there is not, it
 	// creates a move. Then it updates the user list with the current game.
-	InitGame(userID string, initialMove string) string
+	InitGame(userID string, initialMove string) []string
 
 	// prepares a query, which, if there is a current game, it returns the most
 	// recent move. Otherwise, kupa.
-	GetCurrentGameLastMove() []string
+	GetCurrentGameLastMove(userID string) []string
 
 	// prepares a query, which returns the last move of the current game of
 	// the user. If there is no open game, it kupas ?calles InitGame?
@@ -59,22 +59,45 @@ type UsersGamesQueryBuilder interface {
 	// user so far. If the user hasn't played any game, it kupas
 	GetBestGameWindow(userID string, n int, m int) []string
 
-	// this function tries to call func *call* *numberOfTries* times for the
-	// interval of *totalDelay time*. It returns an error message: for succcess
-	// it returns "200 OK", if failed, it returns the message of the error
-	RetryDatabase(call *func() (bool, error), totalDelay time.Duration, numberOfTries int) error
-
 	// Adds move json only if roundnumber in the json corresponds to
 	// 1 + roundnumber stored as the last element in the games list
 	// returns 0 if successful or -1 if not succcessful
 	// AppendMoveToGame (jmove string, gameID string) error
 }
+/*
+type DBQuery interface {
+	toString() string
+	configProperty(string, string)
+	executeQuery() DBResponse
+}
+
+type DBError interface {
+	webTierError bool // unrecoverable
+	DBUnreachable bool // retry query 3 times and then assume DBBroke
+	DBBroke bool // ask consul for a route to a different DB instance
+	errora error
+}
+
+type DBResponse interface {
+	isSuccess() bool
+	errora DBError
+}
+*/
+/*
+
+	RetryDatabase(call *func() (bool, error), totalDelay time.Duration, numberOfTries int) error	
+	// this function tries to call func *call* *numberOfTries* times for the
+	// interval of *totalDelay time*. It returns an error message: for succcess
+	// it returns "200 OK", if failed, it returns the message of the error
+
+
+*/
 
 func delayMiliseconds(n time.Duration) {
 	time.Sleep(n * time.Millisecond)
 }
 
-func IsGameIdValid(gameID string) bool {
+func isGameIdValid(gameID string) bool {
 	// gameID is 32 chars
 	// gameID doesn't contain bad chars
 	valid := map[byte]bool{'0': true, '1': true, '2': true, '3': true,
@@ -101,36 +124,55 @@ func (qb QueryBuilder) GetBestGameWindow(userID string, n int, m int) []string {
 // prepares a query, which checks if there is a game already open for the
 // user. If there is it kupas. If there is not, it
 // creates a move. Then it updates the user list with the current game.
-func (qb QueryBuilder) InitGame(userID string, initialMove string) string {
+func (qb QueryBuilder) InitGame(userID string, initialMove string) []string {
 
-	// userID validation
-
-	var query string
-	query = "lastGameID = redis.call(\"LRANGE\", keys[0], -1, -1)\n" +
-		"lastItemInGame = redis.call(\"LRANGE\", lastGameID, -1, -1)\n" +
-		"if lastItemInGame == \"finished\" then\n" +
-		// init the game using initial move
-		// TODO compose a gameid
-		"else\n" +
-		"return \"kupa\"\n"
-	//userID = `123, -1, -1); redis.call("DELETE", "ALL") #`
-	fmt.Println(query, "\n")
-
-	// fmt.Println(fmt.Sprintf("<%s>", userID))
-	// lastGameID, err := client.Cmd("EVAL", fmt.Sprintf(`return redis.call("LRANGE",KEYS[1],"%s")`, "ivaLikes"), 1, "adam")
-
-	/*
-			client.Cmd("DEL", "queryBuilder::Iva").Str()
-			client.Cmd("RPUSH", "queryBuilder::Iva", jsonified)
-			client.Cmd("RPUSH", "queryBuilder::Iva", "17").Int()
-			err = errors.New("200 OK")
-		}
-		return success, err*/
-
+	// TODO make a initialMove validator?
+	// TODO implement a gameID generator
+	gameID := "ivasgame"
+	gameID = gameID
+	var query []string
+	query = make([]string, 0, 0)
+	query = append(query,
+			 `local lastGameid = redis.call("LRANGE", KEYS[1], -1, -1); 
+			 if lastGameid[1] == nil then error("Failed to find the last gameid of this user") 
+		         return false; 
+			 end 
+			 local lastGameMove = redis.call("LRANGE", lastGameid[1], -1, -1); 
+			 if lastGameMove[1] == nil then error("Failed to find the last move of the last game of this user") 
+		         return false; 
+			 end 
+			 if lastGameMove[1] == "finish" then 
+    		     redis.call("RPUSH", KEYS[1], KEYS[2]); 
+    		     redis.call("RPUSH", KEYS[2], KEYS[3]); 
+			     return true; 
+			 else 
+		         return false; 
+			 end 
+			 print(redis.call("LRANGE", lastGameid[1], -1. -1));`,
+	 userID, initialMove, gameID)
 	return query
 }
 
-func (qb QueryBuilder) GetCurrentGameLastMove() []string {
+func (qb QueryBuilder) GetCurrentGameLastMove(userID string) []string {
+	var query []string
+	query[0] =
+			 "local lastGameid = redis.call(\"LRANGE\", KEYS[1], -1, -1);" +
+			 "if lastGameid[1] == nil then" +
+			 "    error(\"Failed to find the last gameid of this user\");" +
+		     "    return \"\";" +
+			 "end" +
+			 "local lastGameMove = redis.call(\"LRANGE\", lastGameid[1], -1, -1);" +
+			 "if lastGameMove[1] == nil then" +
+			 "    error(\"Failed to find the last move of the last game of this user\")" +
+		     "    return \"\"" +
+			 "end" +
+			 "if lastGameMove[1] == \"finish\" then" +
+			 "    error(\"Error: the user has finished all his games\")" +
+		     "    return \"\";" +
+			 "end" +
+			 "else" +
+			 "    return lastGameMove[1]"
+	query[1] = userID
 	return []string{""}
 }
 
@@ -195,9 +237,8 @@ If the connection was not established, it returns the error generated and nil
 */
 func dialDb() (error, *redis.Client) {
 	var err error
-	var client *redis.Client = nil
-	client, err = redis.Dial("tcp", "localhost:6379")
-	if err != nil {
+	client, err := redis.Dial("tcp", "localhost:6379")
+ 	if err != nil {
 		return err, client
 	} else {
 		err = nil

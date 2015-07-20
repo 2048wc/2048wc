@@ -16,17 +16,64 @@
 
 package main
 
-import "../../queryBuilder"
-
 import "fmt"
-//import "../../boardLib"
-//import "encoding/json"
+import "../../queryBuilder"
+import "github.com/fzzy/radix/redis"
 
 func main() {
-
-	//funkcja := queryBuilder.InitGame
-	//	result := queryBuilder.RetryDatabase(&funkcja, 1000, 4)
-	//	fmt.Println(result)
-	// queryBuilder.InitGame("ivaivaiva", "adamadamadam")
-	//fmt.Println(queryBuilder.IsGameIdValid ("aaaaaaaaaaaaaaaaaaaaaaaaaa"))
+	ugqb := queryBuilder.QueryBuilder{}
+	var query []string
+	query = ugqb.InitGame("a01de45a674ad007a9abcf57b094a2a3", `{"move":true}`)
+	query = query
+	client, err := redis.Dial("tcp", "localhost:6379")
+	replya, errora := client.Cmd("EVAL",
+	   `redis.call("FLUSHALL")
+        redis.call("RPUSH", KEYS[1], "prevGameid");
+        redis.call("RPUSH", "prevGameid", "finish");
+        local lastGameid = redis.call("LRANGE", KEYS[1], -1, -1); 
+		if lastGameid[1] == nil then
+			error("Failed to find the last gameid of this user"); 
+		    return false; 
+		end 
+		local lastGameMove = redis.call("LRANGE", lastGameid[1], -1, -1); 
+		if lastGameMove[1] == nil then 
+			error("Failed to find the last move of the last game of this user") 
+		    return false; 
+		end 
+		if lastGameMove[1] == "finish" then 
+    		local call1 = redis.call("RPUSH", KEYS[1], KEYS[3]); 
+    		local call2 = redis.call("RPUSH", KEYS[3], KEYS[2]);
+            local checkuserid = redis.call("LRANGE", KEYS[1], -1, -1);
+            local checkgameMove = redis.call("LRANGE", KEYS[3], -1, -1);
+            print("call1", call1);
+            print("call2", call2);
+            print("checkuserid", checkuserid[1]);
+            print("checkGameMove", checkgameMove[1]); 
+			return true; 
+		else 
+		    return false; 
+		end`,
+		3, "a01de45a674ad007a9abcf57b094a2a3", `{"move":true}`, `bleh`).Int()
+	fmt.Println(err, replya, "asd", errora)
+	err = err
 }
+
+/*	*/
+
+/*import "fmt"
+import "github.com/fzzy/radix/redis"
+
+func main() {
+    client, err := redis.Dial("tcp", "localhost:6379")
+    if err != nil {
+        println("error! could not coonect to db")
+    } else {
+            client.Cmd("SET", "foo", "bar")
+            reply, err2 := client.Cmd("EVAL", "return 1", 0).Str()
+            if err2 != nil {
+            println("errora: ", err2)
+        }
+        fmt.Println(reply)
+    }
+}
+*/
