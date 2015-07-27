@@ -28,8 +28,7 @@ import "io"
 import "time"
 import "math"
 import "errors"
-
-// import "container/list"
+import "io/ioutil"
 import "reflect"
 
 /* uncomment and use this once the api is fully implemented
@@ -131,25 +130,41 @@ func (qb QueryBuilder) InitGame(userID string, initialMove string) []string {
 	gameID := "ivasgame"
 	gameID = gameID
 	var query []string
-	query = make([]string, 0, 0)
-	query = append(query,
-			 `local lastGameid = redis.call("LRANGE", KEYS[1], -1, -1); 
-			 if lastGameid[1] == nil then error("Failed to find the last gameid of this user") 
-		         return false; 
-			 end 
-			 local lastGameMove = redis.call("LRANGE", lastGameid[1], -1, -1); 
-			 if lastGameMove[1] == nil then error("Failed to find the last move of the last game of this user") 
-		         return false; 
-			 end 
-			 if lastGameMove[1] == "finish" then 
-    		     redis.call("RPUSH", KEYS[1], KEYS[2]); 
-    		     redis.call("RPUSH", KEYS[2], KEYS[3]); 
-			     return true; 
-			 else 
-		         return false; 
-			 end 
-			 print(redis.call("LRANGE", lastGameid[1], -1. -1));`,
-	 userID, initialMove, gameID)
+	query = make([]string, 4)
+	if err != nil {
+		fmt.Println("Err: ", err)
+	}
+	/*
+	query[0] = `redis.call("FLUSHALL");
+        redis.call("RPUSH", KEYS[1], "prevGameid");
+        redis.call("RPUSH", "prevGameid", "finish");
+        local lastGameid = redis.call("LRANGE", KEYS[1], -1, -1); 
+		if lastGameid[1] == nil then
+			error("Failed to find the last gameid of this user"); 
+		    return false; 
+		end 
+		local lastGameMove = redis.call("LRANGE", lastGameid[1], -1, -1); 
+		if lastGameMove[1] == nil then 
+			error("Failed to find the last move of the last game of this user") 
+		    return false; 
+		end 
+		if lastGameMove[1] == "finish" then 
+    		local call1 = redis.call("RPUSH", KEYS[1], KEYS[3]); 
+    		local call2 = redis.call("RPUSH", KEYS[3], KEYS[2]);
+            local checkuserid = redis.call("LRANGE", KEYS[1], -1, -1);
+            local checkgameMove = redis.call("LRANGE", KEYS[3], -1, -1);
+            print("call1", call1);
+            print("call2", call2);
+            print("checkuserid", checkuserid[1]);
+            print("checkGameMove", checkgameMove[1]); 
+			return true; 
+		else 
+		    return false; 
+		end`
+		*/
+	query[1] = userID
+	query[2] = initialMove
+	query[3] = gameID
 	return query
 }
 
