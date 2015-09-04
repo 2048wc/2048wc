@@ -15,18 +15,11 @@
  */
 
 package main
-
+import "../../boardLib"
 import "fmt"
-import "math/big"
-import "encoding/hex"
 
 func main() {
-	//128 64 32 16 8 4 2 1
-	//1   0  1  1  1 1 0 1
-	//1 + 4 + 8 + 16 + 32 + 128 = 189
-	slica := []byte("\xbd\xbd")
-	fmt.Println(len(slica))
-	bigInta := (&big.Int{}).SetBytes(slica)
-	stringa := hex.EncodeToString(bigInta.Bytes())
-	fmt.Println(stringa)
+	move := boardLib.CreateMove()
+	move.InitFirstMove()
+	fmt.Println(move.InternalView())
 }
