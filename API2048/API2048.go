@@ -1,6 +1,5 @@
 package API2048
 
-import ("")
 
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.

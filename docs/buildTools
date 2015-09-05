@@ -1,0 +1,33 @@
+Comparison of build tools.
+gb
+pros:
+ -- can keep everything under version control.
+ -- can have multiple main packages.
+ -- easy updates.
+ -- tightly coupled to the version of go.
+cons:
+ -- breaks go run, and the rest of the go toolchain.
+ -- can not do diamond dependencies.
+ -- has to be installed using go get.
+ -- very immature
+
+godep
+pros:
+ -- mature
+ -- not tightly coupled
+ -- doesn't break go toolchain
+ -- maybe can do diamond dependencies
+cons:
+ -- rewrites imports.
+
+gev(roll our own, chosen)
+pros:
+ -- completely not coupled -- ships its own go.
+ -- familiar, like venv
+ -- would have to use similar for binary dependencies anyway.
+ -- doesn't break almost any go tools (and can ship its own go tools anyway if there's need).
+ -- requires no installation and is a single "source activate" setup.
+cons:
+ -- can't do diamond dependencies (can't do without import rewriting anyway).
+ -- breaks go get (which sucks anyway)
+ -- requires advanced knowledge of git, and I still don't get submodules.

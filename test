@@ -1,2 +1,2 @@
 go test "./queryBuilder"
-go test -v "./boardLib"
+go test "./boardLib"
