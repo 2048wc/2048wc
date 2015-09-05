@@ -16,25 +16,22 @@
 
 package boardLib
 
-import "encoding/json"
-import "encoding/hex"
-import "reflect"
-import "math/big"
-import "fmt"
+import (
+	"../API2048"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"math/big"
+	"reflect"
+)
 
-//import "errors"
-
-import "crypto/sha256"
-
-// The size of the board. Most likely will always stay 4,
-// as this is what seems to be most playable.
-const BoardSize = 4
 const NewTileValue = 2
 
 var allowedMoves map[string]bool = map[string]bool{"left": true, "right": true,
 	"up": true, "down": true}
 
-type boardT [BoardSize][BoardSize]int
+type boardT [API2048.BoardSize][API2048.BoardSize]int
 type positionT [2]int
 type positionValueT struct {
 	Position positionT
@@ -49,61 +46,8 @@ type mergeMoveT struct {
 }
 
 // Creates an empty Move. The move has to be then initialised using
-func CreateMove() Move {
+func CreateMove() API2048.Move {
 	return &moveT{}
-}
-
-type Move interface {
-	// This initialises all the fields with sensible defaults for the first
-	// move. This includes 2 random tiles, a random seed, a non-zero round
-	// number, a valid direction and non-nil pointers for all internal data
-	// structures. After initialisation it is safe to call other functions on
-	// this struct.
-	InitFirstMove()
-
-	// Like InitFirstMove, but with more control over the initial conditions of
-	// the move
-	InitMove(oldBoard [BoardSize][BoardSize]int,
-		direction string, roundNo int, seed string)
-
-	// Init the board using a json passed in as a string. Call ValidateMove
-	// after this function.
-	ParseMove(json string)
-
-	// Sets direction of this move. Allowed directions are left, right,
-	// down, up. Call ValidateMove afterwards to make sure that the struct is
-	// still in acceptable state.
-	SetDirection(string)
-
-	// Returns a new move newMove.OldBoard := oldMove.NewBoard, roundNo += 1,
-	// and the seed carried over.
-	CreateNextMove() Move
-
-	// Evolves board one step forward. Can put errors in ValidateMove.
-	// Call ValidateMove before and afterwards.
-	ResolveMove()
-
-	// Checks if move fields satisfy some basic constraints. Should be
-	// called before ResolveMove. Returns a map of field names onto errors for
-	// incorrectly valued fields. Both Resolved and Unresolved moves satisfy
-	// validation. Resolved moves return isResolved true.
-	ValidateMove() (isResolved bool, errors map[string]error)
-
-	// Internal json representation of the struct. Do not show to the client!
-	// Exports confidential fields.
-	InternalView() (json string)
-
-	// External json representation. Safe to share with the client.
-	ExternalView() (json string)
-
-	// Get Round Number, which is simultanously a score.
-	GetRoundNo() int
-
-	// Get Seed
-	GetSeed() string
-
-	// Get the status of the game.
-	GetGameOver() bool
 }
 
 // The json view of this struct is going to be both
@@ -253,7 +197,7 @@ func (move *moveT) ValidateMove() (bool, map[string]error) {
 // Seed represents a 256 bit number encoded as 64 character long hex number.
 // OldBoard represents a board to evaluate
 // TODO validate values
-func (move *moveT) InitMove(oldBoard [BoardSize][BoardSize]int,
+func (move *moveT) InitMove(oldBoard [API2048.BoardSize][API2048.BoardSize]int,
 	direction string, roundNo int, seed string) {
 	move.Direction = direction
 	move.Seed.SetString(seed, 16)
@@ -262,7 +206,7 @@ func (move *moveT) InitMove(oldBoard [BoardSize][BoardSize]int,
 	move.initMoveCollections()
 }
 
-func (move *moveT) CreateNextMove() Move {
+func (move *moveT) CreateNextMove() API2048.Move {
 	nextMove := &moveT{}
 	nextMove.initMoveCollections()
 	nextMove.Seed = move.Seed
@@ -271,7 +215,6 @@ func (move *moveT) CreateNextMove() Move {
 	return nextMove
 }
 
-//TODO
 func (move *moveT) InitFirstMove() {
 	move.initMoveCollections()
 	move.secondPass()
@@ -311,11 +254,12 @@ func marshalExcludeFields(structa interface{}, excludeFields map[string]bool,
 }
 
 func (move *moveT) initMoveCollections() {
-	move.NonMergeMoves = make([]nonMergeMoveT, 0, BoardSize*BoardSize)
-	move.MergeMoves = make([]mergeMoveT, 0, BoardSize*BoardSize)
-	move.NonMovedTiles = make([]positionT, 0, BoardSize*BoardSize)
-	move.NewTileCandidates = make([]positionT, 0, BoardSize*BoardSize)
-	move.RandomTiles = make([]positionValueT, 0, BoardSize*BoardSize)
+	maxSize := API2048.BoardSize * API2048.BoardSize
+	move.NonMergeMoves = make([]nonMergeMoveT, 0, maxSize)
+	move.MergeMoves = make([]mergeMoveT, 0, maxSize)
+	move.NonMovedTiles = make([]positionT, 0, maxSize)
+	move.NewTileCandidates = make([]positionT, 0, maxSize)
+	move.RandomTiles = make([]positionValueT, 0, maxSize)
 }
 
 func (board *boardT) get(position positionT) int {
@@ -360,25 +304,25 @@ type iterationStateMachine struct {
 
 func (ism *iterationStateMachine) setDirections(direction string) {
 	if direction == "right" {
-		ism.currentIndex = positionT{0, BoardSize - 1}
+		ism.currentIndex = positionT{0, API2048.BoardSize - 1}
 		ism.smallStepForward = [2]int{0, 1}
 		ism.smallStepBackward = [2]int{0, -1}
-		ism.bigStep = [2]int{1, BoardSize - 1}
+		ism.bigStep = [2]int{1, API2048.BoardSize - 1}
 	} else if direction == "left" {
 		ism.currentIndex = positionT{0, 0}
 		ism.smallStepForward = [2]int{0, -1}
 		ism.smallStepBackward = [2]int{0, 1}
-		ism.bigStep = [2]int{1, -BoardSize + 1}
+		ism.bigStep = [2]int{1, -API2048.BoardSize + 1}
 	} else if direction == "up" {
 		ism.currentIndex = positionT{0, 0}
 		ism.smallStepForward = [2]int{-1, 0}
 		ism.smallStepBackward = [2]int{1, 0}
-		ism.bigStep = [2]int{-BoardSize + 1, 1}
+		ism.bigStep = [2]int{-API2048.BoardSize + 1, 1}
 	} else if direction == "down" {
-		ism.currentIndex = positionT{BoardSize - 1, 0}
+		ism.currentIndex = positionT{API2048.BoardSize - 1, 0}
 		ism.smallStepForward = [2]int{1, 0}
 		ism.smallStepBackward = [2]int{-1, 0}
-		ism.bigStep = [2]int{BoardSize - 1, 1}
+		ism.bigStep = [2]int{API2048.BoardSize - 1, 1}
 	}
 }
 
@@ -483,12 +427,12 @@ func (move *moveT) randInt(upperLimit int, previous bool) int {
 func (move *moveT) firstPass() {
 	var ism iterationStateMachine
 	ism.setDirections(move.Direction)
-	for i := 0; i < BoardSize; i++ {
+	for i := 0; i < API2048.BoardSize; i++ {
 		ism.distance = 0
 		move.resolveBoardAtIndex(&ism)
-		for ii := 0; ii < BoardSize-1; ii++ {
+		for ii := 0; ii < API2048.BoardSize-1; ii++ {
 			ism.currentIndex.nextPosition(ism.smallStepBackward, 1)
-			if ii == BoardSize-2 {
+			if ii == API2048.BoardSize-2 {
 				ism.isLast = true
 			}
 			move.resolveBoardAtIndex(&ism)
@@ -502,8 +446,8 @@ func (move *moveT) secondPass() {
 	var lastValueColumns int
 	var mergePossibleRows bool
 	var lastValueRows int
-	for i := 0; i < BoardSize; i++ {
-		for j := 0; j < BoardSize; j++ {
+	for i := 0; i < API2048.BoardSize; i++ {
+		for j := 0; j < API2048.BoardSize; j++ {
 			rowPosition := positionT{i, j}
 			columnPosition := positionT{j, i}
 			rowElem := move.NewBoard.get(rowPosition)
@@ -534,13 +478,13 @@ func (move *moveT) secondPass() {
 
 }
 
-func (move *moveT) generateRandomTiles (wantTwo bool, board *boardT){
+func (move *moveT) generateRandomTiles(wantTwo bool, board *boardT) {
 	choiceRange := len(move.NewTileCandidates)
 	randInt := move.randInt(choiceRange, wantTwo)
 	position := move.NewTileCandidates[randInt]
 	board.set(position, NewTileValue)
 	move.RandomTiles = append(move.RandomTiles,
-	positionValueT{position, NewTileValue})
+		positionValueT{position, NewTileValue})
 	if wantTwo {
 		move.generateRandomTiles(false, board)
 	}
@@ -553,7 +497,7 @@ func (move *moveT) ResolveMove() {
 		//TODO report error
 		move.RoundNo -= 1
 		return
-	} 
+	}
 	move.generateRandomTiles(false, &(move.NewBoard))
 	return
 }

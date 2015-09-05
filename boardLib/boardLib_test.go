@@ -17,6 +17,7 @@
 package boardLib
 
 import (
+	"../API2048"
 	"fmt"
 	"os"
 	"reflect"
@@ -26,8 +27,8 @@ import (
 // test that the board is an n by n iterable where all elements are 0
 func TestBoardInitialised(t *testing.T) {
 	var board boardT
-	for i := 0; i < BoardSize; i++ {
-		for j := 0; j < BoardSize; j++ {
+	for i := 0; i < API2048.BoardSize; i++ {
+		for j := 0; j < API2048.BoardSize; j++ {
 			if board[i][j] != 0 {
 				t.Fail()
 			}
@@ -38,7 +39,7 @@ func TestBoardInitialised(t *testing.T) {
 // we will mostly likely only use board size of 4. If one day
 // we decide otherwise, we can update the test
 func TestBoardSize(t *testing.T) {
-	if BoardSize != 4 {
+	if API2048.BoardSize != 4 {
 		t.Fail()
 	}
 }
@@ -73,7 +74,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 	tests := make([]moveTest, 0)
 	moveTestRight := moveTest{
 		task: moveT{
-			OldBoard: [BoardSize][BoardSize]int{
+			OldBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{2, 2, 2, 2},
 				{4, 2, 2, 0},
 				{2, 0, 2, 0},
@@ -82,7 +83,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 			Direction: "right",
 		},
 		expectedResult: moveT{
-			NewBoard: [BoardSize][BoardSize]int{
+			NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{0, 0, 4, 4},
 				{0, 0, 4, 4},
 				{0, 0, 0, 4},
@@ -92,7 +93,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 	}
 	moveTestDown := moveTest{
 		task: moveT{
-			OldBoard: [BoardSize][BoardSize]int{
+			OldBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{2, 2, 2, 2},
 				{4, 2, 2, 0},
 				{2, 0, 2, 0},
@@ -101,7 +102,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 			Direction: "down",
 		},
 		expectedResult: moveT{
-			NewBoard: [BoardSize][BoardSize]int{
+			NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{0, 0, 0, 0},
 				{2, 0, 0, 0},
 				{4, 0, 2, 0},
@@ -111,7 +112,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 	}
 	moveTestLeft := moveTest{
 		task: moveT{
-			OldBoard: [BoardSize][BoardSize]int{
+			OldBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{2, 2, 2, 2},
 				{4, 2, 2, 0},
 				{2, 0, 2, 0},
@@ -120,7 +121,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 			Direction: "left",
 		},
 		expectedResult: moveT{
-			NewBoard: [BoardSize][BoardSize]int{
+			NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{4, 4, 0, 0},
 				{4, 4, 0, 0},
 				{4, 0, 0, 0},
@@ -130,7 +131,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 	}
 	moveTestUp := moveTest{
 		task: moveT{
-			OldBoard: [BoardSize][BoardSize]int{
+			OldBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{2, 2, 2, 2},
 				{4, 2, 2, 0},
 				{2, 0, 2, 0},
@@ -139,7 +140,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 			Direction: "up",
 		},
 		expectedResult: moveT{
-			NewBoard: [BoardSize][BoardSize]int{
+			NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 				{2, 4, 4, 4},
 				{4, 0, 2, 0},
 				{4, 0, 0, 0},
@@ -156,7 +157,7 @@ func firstPassAllDirectionsNewBoardOnly() []moveTest {
 
 func firstPassAllFieldsTest() moveTest {
 	task := moveT{
-		OldBoard: [BoardSize][BoardSize]int{
+		OldBoard: [API2048.BoardSize][API2048.BoardSize]int{
 			{16, 8, 4, 2},
 			{4, 2, 2, 0},
 			{2, 4, 0, 2},
@@ -165,14 +166,14 @@ func firstPassAllFieldsTest() moveTest {
 		Direction: "right",
 	}
 	expectedResult := moveT{
-		OldBoard: [BoardSize][BoardSize]int{
+		OldBoard: [API2048.BoardSize][API2048.BoardSize]int{
 			{16, 8, 4, 2},
 			{4, 2, 2, 0},
 			{2, 4, 0, 2},
 			{2, 0, 0, 0},
 		},
 		Direction: "right",
-		NewBoard: [BoardSize][BoardSize]int{
+		NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 			{16, 8, 4, 2},
 			{0, 0, 4, 4},
 			{0, 2, 4, 2},
@@ -200,7 +201,6 @@ func setUpMoveRightSeed() string {
 	return "e9ccc20fdb924ed423ad1b46c6df43516685f4c2bc36e202ad467af1b1d1febf"
 }
 
-
 func TestMoveTests(t *testing.T) {
 	var moveTests []moveTest = make([]moveTest, 0, 10)
 	moveTests = append(moveTests, firstPassAllFieldsTest())
@@ -215,7 +215,7 @@ func TestMoveTests(t *testing.T) {
 
 func TestWrongDirection(t *testing.T) {
 	move := moveT{
-		OldBoard: [BoardSize][BoardSize]int{
+		OldBoard: [API2048.BoardSize][API2048.BoardSize]int{
 			{16, 8, 4, 2},
 			{4, 2, 2, 0},
 			{2, 4, 0, 2},
@@ -249,14 +249,14 @@ func TestMarshalWithoutFields(t *testing.T) {
 // 7fffffffffffffffffffffffffffffffffffffffffff6d in hex.
 func TestRandom(t *testing.T) {
 	move := CreateMove().(*moveT)
-	move.InitMove([BoardSize][BoardSize]int{
+	move.InitMove([API2048.BoardSize][API2048.BoardSize]int{
 		{16, 8, 4, 2},
 		{4, 2, 2, 0},
 		{2, 4, 0, 2},
 		{2, 0, 0, 0},
 	}, "left", 21, "7fffffffffffffffffffffffffffffffffffffffffff6d")
 	seedPlusOne := CreateMove().(*moveT)
-	seedPlusOne.InitMove([BoardSize][BoardSize]int{
+	seedPlusOne.InitMove([API2048.BoardSize][API2048.BoardSize]int{
 		{16, 8, 4, 2},
 		{4, 2, 2, 0},
 		{2, 4, 0, 2},
@@ -280,7 +280,7 @@ func TestRandom(t *testing.T) {
 
 func TestSecondPass(t *testing.T) {
 	noGameOverColumns := moveT{
-		NewBoard: [BoardSize][BoardSize]int{
+		NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 			{1, 2, 3, 4},
 			{5, 6, 7, 8},
 			{9, 10, 11, 12},
@@ -296,7 +296,7 @@ func TestSecondPass(t *testing.T) {
 	}
 
 	noGameOverRows := moveT{
-		NewBoard: [BoardSize][BoardSize]int{
+		NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 			{1, 2, 3, 4},
 			{5, 6, 7, 8},
 			{9, 10, 11, 12},
@@ -313,7 +313,7 @@ func TestSecondPass(t *testing.T) {
 	}
 
 	noGameOverEmpties := moveT{
-		NewBoard: [BoardSize][BoardSize]int{
+		NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
 			{1, 2, 3, 4},
 			{0, 6, 0, 8},  // positionT{1, 0}, positionT{1, 2}
 			{9, 0, 11, 0}, // positionT{2, 1}, positionT{2, 3}
@@ -332,9 +332,9 @@ func TestSecondPass(t *testing.T) {
 	}
 }
 
-func TestInternalView(t *testing.T){
-	moveI := CreateMove()	
-	moveI.InitMove([BoardSize][BoardSize]int{}, "", 0, "7fffffffffffffffffffffffffffffffffffffffffff6e")
+func TestInternalView(t *testing.T) {
+	moveI := CreateMove()
+	moveI.InitMove([API2048.BoardSize][API2048.BoardSize]int{}, "", 0, "7fffffffffffffffffffffffffffffffffffffffffff6e")
 	expected := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
 	actual := moveI.InternalView()
 	if actual != expected {
@@ -342,24 +342,24 @@ func TestInternalView(t *testing.T){
 	}
 }
 
-func TestHashing(t *testing.T){
+func TestHashing(t *testing.T) {
 	movea := CreateMove().(*moveT)
 	// hashing a string "a", also known as a byte 0x61 or simply 0110 0001
 	// SHA256 of this string is ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb
 	// In decimal it is 91634880152443617534842621287039938041581081254914058002978601050179556493499
 	// the remainder from division of this number by 1 million is 493499
 	// could be a lucky coincidence ;)
-	movea.InitMove([BoardSize][BoardSize]int{}, "", 0, "61")
-	if movea.randInt(1000*1000, false) != 493499{
+	movea.InitMove([API2048.BoardSize][API2048.BoardSize]int{}, "", 0, "61")
+	if movea.randInt(1000*1000, false) != 493499 {
 		t.Error(movea.randInt(1000*1000, false), "!=", 493499)
 	}
 }
 
-func TestUnmarshalSeed(t *testing.T){
+func TestUnmarshalSeed(t *testing.T) {
 	movea := CreateMove().(*moveT)
 	jsona := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
 	movea.ParseMove(jsona)
-	if (movea.InternalView() != jsona){
+	if movea.InternalView() != jsona {
 		fmt.Println("")
 		fmt.Println(movea.InternalView())
 		fmt.Println(jsona)
@@ -367,10 +367,10 @@ func TestUnmarshalSeed(t *testing.T){
 	}
 }
 
-func TestResolveMove(t *testing.T){
-	var move Move
+func TestResolveMove(t *testing.T) {
+	var move API2048.Move
 	move = CreateMove()
-	move.InitMove([BoardSize][BoardSize]int{
+	move.InitMove([API2048.BoardSize][API2048.BoardSize]int{
 		{0, 0, 0, 2},
 		{0, 2, 0, 0},
 		{0, 0, 4, 8},
@@ -382,7 +382,7 @@ func TestResolveMove(t *testing.T){
 	}
 }
 
-func TestFullPipeline(t *testing.T){
+func TestFullPipeline(t *testing.T) {
 	movea := CreateMove().(*moveT)
 	jsona := `{"Direction":"up","RoundNo":24,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,2],[0,2,0,0],[0,0,4,8],[0,8,64,8]],"NewBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NonMergeMoves":[[[1,1],[0,1]],[[3,1],[1,1]],[[2,2],[0,2]],[[3,2],[1,2]]],"MergeMoves":[{"From":[[2,3],[3,3]],"To":[1,3],"Value":16}],"NonMovedTiles":[[0,3]],"NewTileCandidates":[[0,0],[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,0],"Value":2}]}`
 	movea.ParseMove(jsona)
@@ -398,19 +398,19 @@ func TestFullPipeline(t *testing.T){
 	if moveb.GetRoundNo() == 24 {
 		t.Error("error in moveResolv")
 	}
-	if moveb.InternalView() != `{"Direction":"up","RoundNo":25,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NewBoard":[[2,2,4,2],[0,8,64,16],[0,0,0,0],[0,0,2,0]],"NonMergeMoves":[[[3,0],[0,0]]],"MergeMoves":[],"NonMovedTiles":[[0,1],[1,1],[0,2],[1,2],[0,3],[1,3]],"NewTileCandidates":[[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,2],"Value":2}]}`{
+	if moveb.InternalView() != `{"Direction":"up","RoundNo":25,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NewBoard":[[2,2,4,2],[0,8,64,16],[0,0,0,0],[0,0,2,0]],"NonMergeMoves":[[[3,0],[0,0]]],"MergeMoves":[],"NonMovedTiles":[[0,1],[1,1],[0,2],[1,2],[0,3],[1,3]],"NewTileCandidates":[[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,2],"Value":2}]}` {
 		t.Error("error in moveb")
 	}
 }
 
-func TestInit(t *testing.T){
-	var move Move
+func TestInit(t *testing.T) {
+	var move API2048.Move
 	move = CreateMove()
 	move.InitFirstMove()
 	newTiles := 0
-	for i := 0; i < BoardSize; i++ {
-		for j := 0; j < BoardSize; j++ {
-			if move.(*moveT).OldBoard[i][j] == NewTileValue{
+	for i := 0; i < API2048.BoardSize; i++ {
+		for j := 0; j < API2048.BoardSize; j++ {
+			if move.(*moveT).OldBoard[i][j] == NewTileValue {
 				newTiles += 1
 			}
 		}
