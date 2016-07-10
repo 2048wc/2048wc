@@ -45,7 +45,7 @@ type mergeMoveT struct {
 	Value int
 }
 
-// Creates an empty Move. The move has to be then initialised using
+// Creates an empty Move. The move has to be then initialised using InitFirstMove
 func CreateMove() API2048.Move {
 	return &moveT{}
 }

@@ -1,0 +1,5 @@
+set -e
+go fmt API2048/API2048.go
+go fmt boardLib/boardLib_test.go
+go fmt boardLib/boardLib.go
+go test "./boardLib"

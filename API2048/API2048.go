@@ -1,30 +1,29 @@
 package API2048
 
-
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.
 const BoardSize = 4
 
 // Query that is passed to the database (or in-memory database mock-up).
 type Query interface {
-	
+
 	// Synchronous call, which waits at most maxMillis and by the time it is
-	// finished, the Result or the Error will be ready. 
+	// finished, the Result or the Error will be ready.
 	ExecuteAndWait(maxMillis int)
-	
+
 	// asynchronous call. Check IsReady to see if it finished.
 	Execute()
 
-	// Result as a json string. Depending on the kind of Query it can be parsed 
+	// Result as a json string. Depending on the kind of Query it can be parsed
 	// as a Move, a slice of ints or something else.
 	GetResult() string
-	
-	// Returs the query string. 
+
+	// Returs the query string.
 	GetQuery() string
 
 	// Any errors can be accessed here
 	GetError() error
-	
+
 	// True if the call finished. If true, either Error or Result are guaranteed
 	// to be available.
 	IsReady() bool
@@ -63,7 +62,6 @@ type QueryBuilder interface {
 	// number. Error otherwise.
 	AppendMove(move string, gameID string) Query
 }
-
 
 // A single move representation. Contains all the logic necessary for resolving
 // moves, parsing them from the database and serialising them in a form
@@ -120,4 +118,3 @@ type Move interface {
 	// Get the status of the game.
 	GetGameOver() bool
 }
-
