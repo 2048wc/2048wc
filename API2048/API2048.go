@@ -100,6 +100,7 @@ type Move interface {
 	// called before ResolveMove. Returns a map of field names onto errors for
 	// incorrectly valued fields. Both Resolved and Unresolved moves satisfy
 	// validation. Resolved moves return isResolved true.
+	// TODO refactor to include just the first error.
 	ValidateMove() (isResolved bool, errors map[string]error)
 
 	// Internal json representation of the struct. Do not show to the client!

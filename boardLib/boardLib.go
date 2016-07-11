@@ -18,6 +18,7 @@ package boardLib
 
 import (
 	"../API2048"
+	crypto "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -218,8 +219,13 @@ func (move *moveT) CreateNextMove() API2048.Move {
 func (move *moveT) InitFirstMove() {
 	move.initMoveCollections()
 	move.secondPass()
-	//TODO seed it with a function from utils.
-	(&(move.Seed)).SetString("7fffffffffffffffffffffffffffffffffffffffffff6e", 16)
+	max := big.NewInt(1)
+	// This should be one more than the biggest 256-bit unsigned integer.
+	_ = max.Lsh(max, 256)
+	// We desire 256 bits of entropy. This is equivalent to 64 hexadecimal digits or 32 bytes.
+	seed, _ := crypto.Int(crypto.Reader, max)
+	// TODO handle error
+	move.Seed = *seed
 	move.generateRandomTiles(true, &(move.OldBoard))
 	return
 }
