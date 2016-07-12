@@ -339,7 +339,18 @@ func TestSecondPass(t *testing.T) {
 	}
 	gameOver.secondPass()
 	if !gameOver.IsGameOver {
-		print(gameOver.InternalView())
+		t.Error("should game over")
+	}
+	gameOver2 := moveT{
+		NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
+			{1, 2, 1, 2},
+			{2, 1, 2, 1},
+			{1, 2, 1, 2},
+			{2, 1, 2, 1},
+		},
+	}
+	gameOver2.secondPass()
+	if !gameOver2.IsGameOver {
 		t.Error("should game over")
 	}
 }
