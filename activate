@@ -1,5 +1,4 @@
 #!/bin/bash
-#set -e
 ./activateOuter
 export PATH=$PWD/go/go/bin:$PATH
 export GOROOT=$PWD/go/go/

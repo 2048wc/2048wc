@@ -288,7 +288,7 @@ func TestSecondPass(t *testing.T) {
 		},
 	}
 	noGameOverColumns.secondPass()
-	if noGameOverColumns.IsGameOver != false {
+	if noGameOverColumns.IsGameOver {
 		t.Error("why game over")
 	}
 	if len(noGameOverColumns.NewTileCandidates) != 0 {
@@ -303,9 +303,8 @@ func TestSecondPass(t *testing.T) {
 			{13, 14, 15, 15},
 		},
 	}
-
 	noGameOverRows.secondPass()
-	if noGameOverRows.IsGameOver != false {
+	if noGameOverRows.IsGameOver {
 		t.Error("why game over")
 	}
 	if len(noGameOverRows.NewTileCandidates) != 0 {
@@ -322,13 +321,26 @@ func TestSecondPass(t *testing.T) {
 	}
 
 	noGameOverEmpties.secondPass()
-	if noGameOverEmpties.IsGameOver != false {
+	if noGameOverEmpties.IsGameOver {
 		t.Error("why game over")
 	}
 	if reflect.DeepEqual(noGameOverEmpties.NewTileCandidates,
 		[]positionT{{1, 0}, {1, 2}, {2, 1}, {2, 3}},
 	) == false {
 		t.Error("should be empty")
+	}
+	gameOver := moveT{
+		NewBoard: [API2048.BoardSize][API2048.BoardSize]int{
+			{1, 2, 3, 4},
+			{4, 6, 1, 8},
+			{9, 1, 11, 1},
+			{13, 14, 15, 8},
+		},
+	}
+	gameOver.secondPass()
+	if !gameOver.IsGameOver {
+		print(gameOver.InternalView())
+		t.Error("should game over")
 	}
 }
 

@@ -287,11 +287,6 @@ func (move *moveT) validateBoardInitialisation() {
 	return
 }
 
-//TODO checks if game is over
-func (move *moveT) isGameOver() bool {
-	return false
-}
-
 type iterationStateMachine struct {
 	// These are assigned by setDirections
 	smallStepForward  [2]int
@@ -472,6 +467,8 @@ func (move *moveT) secondPass() {
 			lastValueRows = rowElem
 			lastValueColumns = columnElem
 		}
+		lastValueRows = 0
+		lastValueColumns = 0
 	}
 	var hasNewTiles bool
 	if len(move.NewTileCandidates) == 0 {
@@ -481,7 +478,6 @@ func (move *moveT) secondPass() {
 	}
 	gameOn := mergePossibleRows || mergePossibleColumns || hasNewTiles
 	move.IsGameOver = !gameOn
-
 }
 
 func (move *moveT) generateRandomTiles(wantTwo bool, board *boardT) {
