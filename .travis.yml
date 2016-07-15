@@ -1,0 +1,7 @@
+nguage: go
+go: 
+ - release
+ - tip
+
+script:
+ - ./precommit
