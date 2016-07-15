@@ -1,2 +1,0 @@
-godoc './API2048'
-godoc './boardLib'

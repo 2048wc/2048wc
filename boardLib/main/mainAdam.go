@@ -25,15 +25,15 @@ import "strings"
 import "encoding/json"
 import "../../API2048"
 
-func prettyPrint(data string, oldBoard bool){
+func prettyPrint(data string, oldBoard bool) {
 	accessString := "NewBoard"
-	if oldBoard{
+	if oldBoard {
 		accessString = "OldBoard"
 	}
 	var result map[string]interface{}
 	_ = json.Unmarshal([]byte(data), &result)
 	parsedResult := result[accessString].([]interface{})
-	for i := 0; i < API2048.BoardSize; i++{
+	for i := 0; i < API2048.BoardSize; i++ {
 		parsedResultInner := parsedResult[i].([]interface{})
 		for j := 0; j < API2048.BoardSize; j++ {
 			fmt.Print(parsedResultInner[j], "\t")
@@ -60,16 +60,16 @@ func main() {
 			os.Exit(1)
 		}
 		switch {
-			case strings.Contains(line, "h"):
-				direction = "left"
-			case strings.Contains(line, "j"):
-				direction = "down"
-			case strings.Contains(line, "k"):
-				direction = "up"
-			case strings.Contains(line, "l"):
-				direction = "right"
-			default:
-				fmt.Println("")
+		case strings.Contains(line, "h"):
+			direction = "left"
+		case strings.Contains(line, "j"):
+			direction = "down"
+		case strings.Contains(line, "k"):
+			direction = "up"
+		case strings.Contains(line, "l"):
+			direction = "right"
+		default:
+			fmt.Println("")
 		}
 		move.SetDirection(direction)
 		move.ResolveMove()

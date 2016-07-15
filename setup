@@ -1,0 +1,4 @@
+set -e
+go version
+echo "(./precommit)" > .git/hooks/pre-commit
+echo "exit \$?" >> .git/hooks/pre-commit

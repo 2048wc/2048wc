@@ -1,4 +1,0 @@
-#!/bin/bash
-rm -fr go/
-git worktree prune
-git worktree add go go1.6.2
