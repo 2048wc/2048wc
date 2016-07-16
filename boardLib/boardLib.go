@@ -60,7 +60,7 @@ func CreateMove() API2048.Move {
 // for security reasons.
 
 type moveT struct {
-	//You are responsible for initialising those
+	// You are responsible for initialising those
 	Direction string
 	RoundNo   int
 	Seed      big.Int
@@ -77,7 +77,7 @@ type moveT struct {
 }
 
 type internalMoveT struct {
-	//You are responsible for initialising those
+	// You are responsible for initialising those
 	Direction string
 	RoundNo   int
 	Seed      string
@@ -94,6 +94,7 @@ type internalMoveT struct {
 }
 
 func (move *moveT) GetGameOver() bool {
+	move.secondPass()
 	return move.IsGameOver
 }
 
@@ -443,6 +444,8 @@ func (move *moveT) firstPass() {
 }
 
 func (move *moveT) secondPass() {
+	// the line below reinitialises NewTileCandidates. The purpose is to make secondPass indempotent, which is required in order to call it in GetGameOver.
+	move.NewTileCandidates = make([]positionT, 0, API2048.BoardSize*API2048.BoardSize)
 	var mergePossibleColumns bool
 	var lastValueColumns int
 	var mergePossibleRows bool
@@ -488,6 +491,9 @@ func (move *moveT) generateRandomTiles(wantTwo bool, board *boardT) {
 	move.RandomTiles = append(move.RandomTiles,
 		positionValueT{position, NewTileValue})
 	if wantTwo {
+		// this deletes a candidate. If you remove this line, this will cause a bug that once in ~16 Board initialisations instead of expected two tiles you'll end up with only one!
+		move.NewTileCandidates = append(move.NewTileCandidates[:randInt],
+			move.NewTileCandidates[randInt+1:]...)
 		move.generateRandomTiles(false, board)
 	}
 }

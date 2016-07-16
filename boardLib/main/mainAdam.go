@@ -33,12 +33,14 @@ func prettyPrint(data string, oldBoard bool) {
 	var result map[string]interface{}
 	_ = json.Unmarshal([]byte(data), &result)
 	parsedResult := result[accessString].([]interface{})
+	fmt.Println("\n")
 	for i := 0; i < API2048.BoardSize; i++ {
+		fmt.Print("\t")
 		parsedResultInner := parsedResult[i].([]interface{})
 		for j := 0; j < API2048.BoardSize; j++ {
 			fmt.Print(parsedResultInner[j], "\t")
 		}
-		fmt.Println("")
+		fmt.Println("\n")
 	}
 	fmt.Println("Score ", result["RoundNo"])
 	return
@@ -51,8 +53,8 @@ func main() {
 	var direction string
 	var line string
 	var err error
-	for !move.GetGameOver() {
-		fmt.Println("press h, j, k or l and press enter.")
+	for true {
+		fmt.Println("press w, s, a or d and press enter.")
 		reader := bufio.NewReader(os.Stdin)
 		line, err = reader.ReadString('\n')
 		if err != nil {
@@ -60,20 +62,26 @@ func main() {
 			os.Exit(1)
 		}
 		switch {
-		case strings.Contains(line, "h"):
+		case strings.Contains(line, "a"):
 			direction = "left"
-		case strings.Contains(line, "j"):
+		case strings.Contains(line, "s"):
 			direction = "down"
-		case strings.Contains(line, "k"):
+		case strings.Contains(line, "w"):
 			direction = "up"
-		case strings.Contains(line, "l"):
+		case strings.Contains(line, "d"):
 			direction = "right"
 		default:
-			fmt.Println("")
+			continue
 		}
 		move.SetDirection(direction)
 		move.ResolveMove()
-		prettyPrint(move.ExternalView(), false)
-		move = move.CreateNextMove()
+		if move.GetGameOver() {
+			break
+		} else {
+			move = move.CreateNextMove()
+		}
+		prettyPrint(move.ExternalView(), true)
 	}
+	prettyPrint(move.ExternalView(), false)
+	fmt.Println("Game Over")
 }

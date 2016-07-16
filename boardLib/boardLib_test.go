@@ -433,7 +433,10 @@ func TestFullPipeline(t *testing.T) {
 	if moveb.GetRoundNo() == 24 {
 		t.Error("error in moveResolv")
 	}
-	if moveb.InternalView() != `{"Direction":"up","RoundNo":25,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NewBoard":[[2,2,4,2],[0,8,64,16],[0,0,0,0],[0,0,2,0]],"NonMergeMoves":[[[3,0],[0,0]]],"MergeMoves":[],"NonMovedTiles":[[0,1],[1,1],[0,2],[1,2],[0,3],[1,3]],"NewTileCandidates":[[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,2],"Value":2}]}` {
+	expectedInternalView := `{"Direction":"up","RoundNo":25,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NewBoard":[[2,2,4,2],[0,8,64,16],[0,0,0,0],[0,0,2,0]],"NonMergeMoves":[[[3,0],[0,0]]],"MergeMoves":[],"NonMovedTiles":[[0,1],[1,1],[0,2],[1,2],[0,3],[1,3]],"NewTileCandidates":[[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,2],"Value":2}]}`
+	if moveb.InternalView() != expectedInternalView {
+		fmt.Println(moveb.InternalView())
+		fmt.Println(expectedInternalView)
 		t.Error("error in moveb")
 	}
 }
@@ -453,4 +456,21 @@ func TestInit(t *testing.T) {
 	if newTiles != 2 {
 		t.Error("need 2 new tiles to start with")
 	}
+}
+
+func TestGameOver(t *testing.T) {
+	move := CreateMove()
+	board := [API2048.BoardSize][API2048.BoardSize]int{
+		{4, 8, 64, 2},
+		{8, 4, 8, 4},
+		{4, 32, 4, 2},
+		{4, 128, 16, 0},
+	}
+	direction := "right"
+	move.InitMove(board, direction, 10, "a")
+	move.ResolveMove()
+	if !move.GetGameOver() {
+		t.Error("this needs to game over")
+	}
+
 }
