@@ -1,3 +1,19 @@
+/* Copyright (C) 2015  Adam Kurkiewicz and Iva Babukova
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published
+ *   by the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package API2048
 
 // The size of the board. Most likely will always stay 4,
@@ -24,7 +40,7 @@ type Query interface {
 	// of this query when the result is ready.
 	ExecuteAndCall(callback QueryCallback)
 
-	// Channel, which receives true if the a call to Execute was successful or false, if it errored.
+	// Channel, which receives true if a call to Execute was successful or false, if it errored.
 	StatusChannel() chan bool
 
 	// Result as a json string. Depending on the kind of Query it can be parsed
@@ -35,7 +51,7 @@ type Query interface {
 	QueryString() string
 
 	// The most recent error or nil
-	Error() error
+	Error() QueryError
 
 	// True if the call finished. If true, either Error or Result are guaranteed
 	// to be available.
@@ -46,34 +62,57 @@ type Query interface {
 	HowLong() int
 }
 
+const (
+	BackendConnectionError = iota
+	NoGameError            = iota
+)
+
+type QueryError interface {
+	Error() string
+	Code() int
+}
+
 // QueryBuilder builds queries that can be subsequently executed.
 type QueryBuilder interface {
+	HasCurrentGame(userID string)
 
-	// prepares a query, which checks if there is a game already open for the
+	// Prepares a query, which checks if there is a game already open for the
 	// user. If there is it errors. If there is not, it
 	// creates the first move. Then it updates the user list with the
 	// current game. The result is an empty string.
-	InitGame(userID string, firstMove string) Query
+	InitCurrentGame(userID string) Query
 
-	// prepares a query, which returns the most recent move. If there's no
+	//
+	//
+	CloseGame(userID string) Query
+
+	// Prepares a query, which returns the most recent move. If there's no
 	// current game it errors.
 	// The result can be parsed as move.
 	GetCurrentGameLastMove(userID string) Query
 
-	// prepares a query, which returns the last move of the current game of
-	// the user. If there is no open game, it errors
+	// Prepares a query, which returns the last move of the current game of
+	// the user. If there is no open game, it errors with the NoGame code.
 	GetCurrentGame(userID string) Query
 
-	// prepares a query, which returns the score of [left, right] best games
+	// Prepares a query, which returns the score of [left, right] best games
 	// played by the user so far. The range is inclusive, so to get the best and
 	// the second best game one would use GetBestGameWindow(userID, 1, 2). If
 	// the the interval is too broad, the query will return the broades result
 	// possible. The result is parsable as a slice of GameScores.
 	GetBestGames(userID string, left int, right int) Query
 
-	// Adds move json if the round number is 1 more than the last stored round
-	// number. Error otherwise.
-	AppendMove(move string, gameID string) Query
+	// Prepares a query, which appends a move to the current game.
+	AppendMoveCurrentGame(move string) Query
+}
+
+type QueryBuilderMockup interface {
+
+	// Reinitalises the detabase mockup so that it is like new, uninitialised database.
+	ResetState()
+
+	// Adds a new user to the database mockup so games can be registered against that user.
+	AddUser(userID string)
 }
 
 type MoveCreator interface {

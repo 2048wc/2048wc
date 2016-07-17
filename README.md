@@ -2,7 +2,9 @@
 
 # 2048wc
 
-2048wc is an implementation of a business idea for a website, where people can challenge their facebook, twitter or gmail (google+) friends in 2048 and win (or loose) bragging rights or tiny amount of money from each other.
+2048wc is an implementation of a business idea for a website, where people can challenge their friends in 2048 to win (or loose) bragging rights or tiny amount of money.
+
+## Developer Setup
 
 After cloning this repository execute `source setup2048` to:
 
@@ -36,17 +38,17 @@ simpleCLI does not implement any interfaces.
 
 simpleCLI depends on boardLib.
 
-simpleCLI can be run with `go build ./... && bin/simpleCLI`
+simpleCLI can be run with `source setup2048 && go build simpleCLI && ./simpleCLI`
 
 ### mockDB
 
-mockDB is an in-memory pure-Go implementation of the database part of 2048wc. As the data does not get persisted to disk, this can't be used in production, but is useful for testing, debugging, presentations and any other situation when running a database is not preferred.
+mockDB is an in-memory pure-Go implementation of the database part of the project. As the data does not get persisted to disk, this can't be used in production, but is useful for testing, debugging, presentations and any other situation when running a database is not preferred.
 
 mockDB implements API2048.QueryCallback, API2048.Query and API2048.QueryBuilder interfaces.
 
 mockDB does not have any dependencies.
 
-mockDB is and can't be run directly.
+mockDB is library-like and can't be run directly.
 
 ### userAuthLib
 
