@@ -24,6 +24,8 @@ import (
 	"testing"
 )
 
+var moveCreator API2048.MoveCreator = MoveCreator{}
+
 // test that the board is an n by n iterable where all elements are 0
 func TestBoardInitialised(t *testing.T) {
 	var board boardT
@@ -248,14 +250,14 @@ func TestMarshalWithoutFields(t *testing.T) {
 // 12259964326927110866866776217202473468949912977468817261 is
 // 7fffffffffffffffffffffffffffffffffffffffffff6d in hex.
 func TestRandom(t *testing.T) {
-	move := CreateMove().(*moveT)
+	move := moveCreator.CreateMove().(*moveT)
 	move.InitMove([API2048.BoardSize][API2048.BoardSize]int{
 		{16, 8, 4, 2},
 		{4, 2, 2, 0},
 		{2, 4, 0, 2},
 		{2, 0, 0, 0},
 	}, "left", 21, "7fffffffffffffffffffffffffffffffffffffffffff6d")
-	seedPlusOne := CreateMove().(*moveT)
+	seedPlusOne := moveCreator.CreateMove().(*moveT)
 	seedPlusOne.InitMove([API2048.BoardSize][API2048.BoardSize]int{
 		{16, 8, 4, 2},
 		{4, 2, 2, 0},
@@ -368,7 +370,7 @@ func TestSecondPass(t *testing.T) {
 }
 
 func TestInternalView(t *testing.T) {
-	moveI := CreateMove()
+	moveI := moveCreator.CreateMove()
 	moveI.InitMove([API2048.BoardSize][API2048.BoardSize]int{}, "", 0, "7fffffffffffffffffffffffffffffffffffffffffff6e")
 	expected := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
 	actual := moveI.InternalView()
@@ -378,7 +380,7 @@ func TestInternalView(t *testing.T) {
 }
 
 func TestHashing(t *testing.T) {
-	movea := CreateMove().(*moveT)
+	movea := moveCreator.CreateMove().(*moveT)
 	// hashing a string "a", also known as a byte 0x61 or simply 0110 0001
 	// SHA256 of this string is ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb
 	// In decimal it is 91634880152443617534842621287039938041581081254914058002978601050179556493499
@@ -391,7 +393,7 @@ func TestHashing(t *testing.T) {
 }
 
 func TestUnmarshalSeed(t *testing.T) {
-	movea := CreateMove().(*moveT)
+	movea := moveCreator.CreateMove().(*moveT)
 	jsona := `{"Direction":"","RoundNo":0,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NewBoard":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"NonMergeMoves":[],"MergeMoves":[],"NonMovedTiles":[],"NewTileCandidates":[],"IsGameOver":false,"RandomTiles":[]}`
 	movea.ParseMove(jsona)
 	if movea.InternalView() != jsona {
@@ -404,7 +406,7 @@ func TestUnmarshalSeed(t *testing.T) {
 
 func TestResolveMove(t *testing.T) {
 	var move API2048.Move
-	move = CreateMove()
+	move = moveCreator.CreateMove()
 	move.InitMove([API2048.BoardSize][API2048.BoardSize]int{
 		{0, 0, 0, 2},
 		{0, 2, 0, 0},
@@ -421,7 +423,7 @@ func TestResolveMove(t *testing.T) {
 }
 
 func TestFullPipeline(t *testing.T) {
-	movea := CreateMove().(*moveT)
+	movea := moveCreator.CreateMove().(*moveT)
 	jsona := `{"Direction":"up","RoundNo":24,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,2],[0,2,0,0],[0,0,4,8],[0,8,64,8]],"NewBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NonMergeMoves":[[[1,1],[0,1]],[[3,1],[1,1]],[[2,2],[0,2]],[[3,2],[1,2]]],"MergeMoves":[{"From":[[2,3],[3,3]],"To":[1,3],"Value":16}],"NonMovedTiles":[[0,3]],"NewTileCandidates":[[0,0],[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,0],"Value":2}]}`
 	movea.ParseMove(jsona)
 	moveb := movea.CreateNextMove()
@@ -446,7 +448,7 @@ func TestFullPipeline(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	var move API2048.Move
-	move = CreateMove()
+	move = moveCreator.CreateMove()
 	move.InitFirstMove()
 	newTiles := 0
 	for i := 0; i < API2048.BoardSize; i++ {
@@ -462,7 +464,7 @@ func TestInit(t *testing.T) {
 }
 
 func TestGameOver(t *testing.T) {
-	move := CreateMove()
+	move := moveCreator.CreateMove()
 	board := [API2048.BoardSize][API2048.BoardSize]int{
 		{4, 8, 64, 2},
 		{8, 4, 8, 4},

@@ -47,7 +47,9 @@ func prettyPrint(data string, oldBoard bool) {
 }
 
 func main() {
-	move := boardLib.CreateMove()
+	var moveCreator API2048.MoveCreator
+	moveCreator = boardLib.MoveCreator{}
+	move := moveCreator.CreateMove()
 	move.InitFirstMove()
 	prettyPrint(move.ExternalView(), true)
 	var direction string

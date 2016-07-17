@@ -4,25 +4,38 @@ package API2048
 // as this is what seems to be most playable.
 const BoardSize = 4
 
+type QueryCallback interface {
+	Callback(query Query)
+}
+
 // Query that is passed to the database (or in-memory database mock-up).
 type Query interface {
 
 	// Synchronous call, which waits at most maxMillis and by the time it is
-	// finished, the Result or the Error will be ready.
+	// finished, the Result or the Error will be ready. At most one call to
+	// ExecuteAndWait can be made at one time.
 	ExecuteAndWait(maxMillis int)
 
-	// asynchronous call. Check IsReady to see if it finished.
+	// Asynchronous call. Check IsReady to see if it finished, or listen on the StatusChannel.
 	Execute()
+
+	// Asynchronous call with a callback. Pass in an implementation of
+	// QueryCallback and Query.Callback will be called with the current instance
+	// of this query when the result is ready.
+	ExecuteAndCall(callback QueryCallback)
+
+	// Channel, which receives true if the a call to Execute was successful or false, if it errored.
+	StatusChannel() chan bool
 
 	// Result as a json string. Depending on the kind of Query it can be parsed
 	// as a Move, a slice of ints or something else.
-	GetResult() string
+	ResultString() string
 
 	// Returs the query string.
-	GetQuery() string
+	QueryString() string
 
-	// Any errors can be accessed here
-	GetError() error
+	// The most recent error or nil
+	Error() error
 
 	// True if the call finished. If true, either Error or Result are guaranteed
 	// to be available.
@@ -63,9 +76,14 @@ type QueryBuilder interface {
 	AppendMove(move string, gameID string) Query
 }
 
+type MoveCreator interface {
+	// Creates an empty, unitialised, unresolved Move.
+	CreateMove() Move
+}
+
 // A single move representation. Contains all the logic necessary for resolving
 // moves, parsing them from the database and serialising them in a form
-// acceptable by the database.
+// acceptable by the database. Implemented by boardLib.
 type Move interface {
 	// This initialises all the fields with sensible defaults for the first
 	// move. This includes 2 random tiles, a random seed, a non-zero round
