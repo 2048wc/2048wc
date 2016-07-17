@@ -1,4 +1,7 @@
 echo "make sure to execute from the root of git repository"
+export GOPATH=$PWD
+mkdir -p bin
+mkdir -p pkg
 set -e
 go fmt ./...
 go test ./...

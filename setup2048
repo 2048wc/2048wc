@@ -1,0 +1,12 @@
+#!/bin/sh
+export GOPATH="$PWD"
+mkdir -p src
+mkdir -p bin
+mkdir -p pkg
+go version > /dev/null
+hasGo=$?
+if [[ $hasGo != 0 ]]; then
+  echo "You have to install go first."
+fi
+echo "(./precommit)" > .git/hooks/pre-commit
+echo "exit \$?" >> .git/hooks/pre-commit

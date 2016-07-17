@@ -17,7 +17,7 @@
 package boardLib
 
 import (
-	"../API2048"
+	"API2048"
 	"fmt"
 	"os"
 	"reflect"

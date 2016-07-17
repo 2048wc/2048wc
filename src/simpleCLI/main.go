@@ -16,14 +16,14 @@
 
 package main
 
-import "../boardLib"
+import "boardLib"
 import "fmt"
 import "bufio"
 import "os"
 import "log"
 import "strings"
 import "encoding/json"
-import "../API2048"
+import "API2048"
 
 func prettyPrint(data string, oldBoard bool) {
 	accessString := "NewBoard"
