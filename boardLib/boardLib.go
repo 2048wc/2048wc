@@ -212,7 +212,7 @@ func (move *moveT) CreateNextMove() API2048.Move {
 	nextMove := &moveT{}
 	nextMove.initMoveCollections()
 	nextMove.Seed = move.Seed
-	nextMove.RoundNo = move.RoundNo + 1
+	nextMove.RoundNo = move.RoundNo
 	nextMove.OldBoard = move.NewBoard
 	return nextMove
 }
@@ -503,9 +503,10 @@ func (move *moveT) ResolveMove() {
 	move.secondPass()
 	if len(move.NonMergeMoves) == 0 && len(move.MergeMoves) == 0 {
 		//TODO report error
-		move.RoundNo -= 1
 		return
+	} else {
+		move.RoundNo += 1
+		move.generateRandomTiles(false, &(move.NewBoard))
 	}
-	move.generateRandomTiles(false, &(move.NewBoard))
 	return
 }

@@ -75,13 +75,12 @@ func main() {
 		}
 		move.SetDirection(direction)
 		move.ResolveMove()
+		prettyPrint(move.ExternalView(), false)
 		if move.GetGameOver() {
 			break
 		} else {
 			move = move.CreateNextMove()
 		}
-		prettyPrint(move.ExternalView(), true)
 	}
-	prettyPrint(move.ExternalView(), false)
 	fmt.Println("Game Over")
 }

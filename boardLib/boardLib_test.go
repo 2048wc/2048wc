@@ -412,7 +412,10 @@ func TestResolveMove(t *testing.T) {
 		{0, 8, 64, 8},
 	}, "up", 24, "7fffffffffffffffffffffffffffffffffffffffffff6e")
 	move.ResolveMove()
-	if move.InternalView() != `{"Direction":"up","RoundNo":24,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,2],[0,2,0,0],[0,0,4,8],[0,8,64,8]],"NewBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NonMergeMoves":[[[1,1],[0,1]],[[3,1],[1,1]],[[2,2],[0,2]],[[3,2],[1,2]]],"MergeMoves":[{"From":[[2,3],[3,3]],"To":[1,3],"Value":16}],"NonMovedTiles":[[0,3]],"NewTileCandidates":[[0,0],[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,0],"Value":2}]}` {
+	expected := `{"Direction":"up","RoundNo":25,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,2],[0,2,0,0],[0,0,4,8],[0,8,64,8]],"NewBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[0,0,0,2]],"NonMergeMoves":[[[1,1],[0,1]],[[3,1],[1,1]],[[2,2],[0,2]],[[3,2],[1,2]]],"MergeMoves":[{"From":[[2,3],[3,3]],"To":[1,3],"Value":16}],"NonMovedTiles":[[0,3]],"NewTileCandidates":[[0,0],[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,3],"Value":2}]}`
+	if move.InternalView() != expected {
+		fmt.Println(move.InternalView())
+		fmt.Println(expected)
 		t.Error("move is not properly resolved")
 	}
 }
@@ -422,16 +425,16 @@ func TestFullPipeline(t *testing.T) {
 	jsona := `{"Direction":"up","RoundNo":24,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,0,0,2],[0,2,0,0],[0,0,4,8],[0,8,64,8]],"NewBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NonMergeMoves":[[[1,1],[0,1]],[[3,1],[1,1]],[[2,2],[0,2]],[[3,2],[1,2]]],"MergeMoves":[{"From":[[2,3],[3,3]],"To":[1,3],"Value":16}],"NonMovedTiles":[[0,3]],"NewTileCandidates":[[0,0],[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,0],"Value":2}]}`
 	movea.ParseMove(jsona)
 	moveb := movea.CreateNextMove()
-	if moveb.GetRoundNo() != 25 {
-		t.Error("do round up")
+	if moveb.GetRoundNo() != 24 {
+		t.Error("do not round up")
 	}
 	if moveb.GetSeed() != "7fffffffffffffffffffffffffffffffffffffffffff6e" {
 		t.Error("seed stays the same")
 	}
 	moveb.SetDirection("up")
 	moveb.ResolveMove()
-	if moveb.GetRoundNo() == 24 {
-		t.Error("error in moveResolv")
+	if moveb.GetRoundNo() != 25 {
+		t.Error("do round up")
 	}
 	expectedInternalView := `{"Direction":"up","RoundNo":25,"Seed":"7fffffffffffffffffffffffffffffffffffffffffff6e","OldBoard":[[0,2,4,2],[0,8,64,16],[0,0,0,0],[2,0,0,0]],"NewBoard":[[2,2,4,2],[0,8,64,16],[0,0,0,0],[0,0,2,0]],"NonMergeMoves":[[[3,0],[0,0]]],"MergeMoves":[],"NonMovedTiles":[[0,1],[1,1],[0,2],[1,2],[0,3],[1,3]],"NewTileCandidates":[[1,0],[2,0],[2,1],[2,2],[2,3],[3,0],[3,1],[3,2],[3,3]],"IsGameOver":false,"RandomTiles":[{"Position":[3,2],"Value":2}]}`
 	if moveb.InternalView() != expectedInternalView {
@@ -470,7 +473,10 @@ func TestGameOver(t *testing.T) {
 	move.InitMove(board, direction, 10, "a")
 	move.ResolveMove()
 	if !move.GetGameOver() {
-		t.Error("this needs to game over")
+		t.Error("this needs to game over.")
+	}
+	if move.GetRoundNo() != 11 {
+		t.Error("bad round number.")
 	}
 
 }
