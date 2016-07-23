@@ -16,11 +16,14 @@ package API2048
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/********************************** Move API **********************************/
+
 // The size of the board. Most likely will always stay 4,
 // as this is what seems to be most playable.
 const BoardSize = 4
 
-// Any component implementing logic of 2048 must satisfy this interface. Implemented by boardLib.
+// Any component implementing logic of 2048 must satisfy this interface.
+// Implemented by boardLib.
 type MoveCreator interface {
 	// Creates an empty, unitialised, unresolved Move.
 	CreateMove() Move
@@ -83,11 +86,23 @@ type Move interface {
 	GetGameOver() bool
 }
 
-// A move representation that can be serialised into a database.
+/*********************************** DB API ***********************************/
+
+// A move representation that can be serialised into a database. Move field
+// contains an object implementing the Move interface encoded as a json
+// string, with some fields exposed in unserialised form (RoundNo -> MoveNo,
+// GameOver -> !IsOpen). The purpose of this indirection is to avoid serialising
+//  Move into database directly in order to keeping the implementations of
+// DB API and Move API independent.
 type MoveEntry struct {
-	Move   string
-	MoveNo int  // Same as RoundNo in Move
-	IsOpen bool // Inverse of GameOver in Move
+	// json-encoded Move
+	Move string
+
+	// Same as RoundNo in Move
+	MoveNo int
+
+	// Inverse of GameOver in Move
+	IsOpen bool
 }
 
 type ScoreRange struct {
@@ -103,8 +118,8 @@ type QueryCallback interface {
 type Query interface {
 
 	// Synchronous call, which waits at most maxMillis and by the time it is
-	// finished, the Result or the Error will be ready. At most one call to
-	// ExecuteAndWait can be made at one time.
+	// finished, the Result or the Error will be ready. If you pass 0, it will
+	// wait 20s (20000ms).
 	ExecuteAndWait(maxMillis int)
 
 	// Asynchronous call. Check IsReady to see if it finished, or listen on the StatusChannel.
@@ -136,6 +151,7 @@ type Query interface {
 	HowLong() int
 }
 
+// DB API error codes.
 const (
 	BackendConnectionError = iota
 	NoGameError            = iota
@@ -143,6 +159,7 @@ const (
 	MoveConstraintError    = iota
 )
 
+// DB API error. TODO refactor into a struct
 type QueryError interface {
 	Error() string
 	Code() int
